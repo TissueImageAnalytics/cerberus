@@ -1,0 +1,53 @@
+
+
+loader_kwargs:
+  train: {batch_size : 24, nr_procs: 0}
+  valid: {batch_size : 24, nr_procs: 0}
+  test : {batch_size : 24, nr_procs: 0}
+
+optimizer_kwargs:
+  'lr' : 1.0e-3
+  'betas' : [0.9, 0.999]
+  'weight_decay' : 0.0
+
+loss_kwargs:
+  # 'Lumen-INST'  : {'weight': 1.5, "loss" : {"ce": 1}}
+  # 'Gland-INST'  : {'weight': 1.4, "loss" : {"ce": 1}}
+  # 'Nuclei-INST' : {'weight': 1, "loss" : {"ce": 1}}
+  # 'Patch-Class' : {'weight': 0.4, "loss" : {"ce": 1}}
+  'Lumen-INST'  : {'weight': 0, "loss" : {"ce": 1}}
+  'Gland-INST'  : {'weight': 0, "loss" : {"ce": 1}}
+  'Nuclei-INST' : {'weight': 0, "loss" : {"ce": 1}}
+  'Nuclei-TYPE' : {'weight': 0, "loss" : {"ce": 1, "dice": 1}}
+  'Gland-TYPE' : {'weight': 1, "loss" : {"ce": 1, "dice": 1}}
+  'Patch-Class' : {'weight': 0, "loss" : {"ce": 1}}
+
+dataset_kwargs:
+  input_shape: 448
+  output_shape: 448
+  class_input_shape: 144
+  req_target_code: 
+    'Lumen-INST' : 'IP-ERODED-CONTOUR-3'
+    'Gland-INST' : 'IP-ERODED-CONTOUR-11'
+    'Nuclei-INST': 'IP-ERODED-CONTOUR-3'
+    'Nuclei-TYPE': 'TP'
+    'Gland-TYPE': 'TP'
+    'Patch-Class': 'PC'
+
+model_kwargs:
+  encoder_backbone_name       : resnet34
+  freeze_encoder              : False
+  inst_class_mode             : False
+  decoder_kwargs              :  
+    'Lumen':
+        'INST': 3           
+    'Gland': 
+        'INST': 3
+    'Nuclei':
+        'INST': 3
+    'Nuclei#TYPE':
+        'TYPE': 7
+    'Gland#TYPE':
+        'TYPE': 3
+    'Patch-Class':
+        'OUT': 9

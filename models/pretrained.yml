@@ -1,0 +1,14 @@
+resnet34:
+  fold1:
+    imagenet_mtl: pretrained_weights/resnet34_imagenet-mtl_fold1.tar
+    imagenet_mtl_class: pretrained_weights/resnet34_imagenet-mtl-class_fold1.tar
+    imagenet_mtl_class_cobi: /root/workspace/colon_analysis_tmp/logs/resnet34/Lumen_Gland_Nuclei_Patch-Class/fold1/v1.0-COBI-continue/model/net_step-024000.tar
+    imagenet_mtl_class_cobi_nuc: /root/workspace/colon_analysis_tmp/logs/resnet34/Lumen_Gland_Nuclei_Nuclei#TYPE_Patch-Class/fold1/v1.0-COBI-nuc/model/net_step-005600.tar
+
+  fold2: 
+    imagenet_mtl: pretrained_weights/resnet34_imagenet-mtl_fold2.tar
+    imagenet_mtl_class: pretrained_weights/resnet34_imagenet-mtl-class_fold2.tar
+
+  fold3:
+    imagenet_mtl: pretrained_weights/resnet34_imagenet-mtl_fold3.tar
+    imagenet_mtl_class: pretrained_weights/resnet34_imagenet-mtl-class_fold3.tar

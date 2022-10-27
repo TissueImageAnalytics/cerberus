@@ -1,0 +1,79 @@
+
+# Must be in the same ordering as actual channel
+# 'INST' mean each int value denotes different inst mask
+# 'TYPE' mean each int value denotes different semantic class
+
+# assuming each dataset only has 1 img_dir, where 
+# each img may have one or many annotations
+
+gland:
+  img_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Images/'
+  img_ext: '.png' # can also be a list of extension
+  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/'
+  msk_ext: '.png'
+  split_info: '/root/lsf_workspace/train_data/mtl/info/info_gland.csv'
+  nr_splits: 3
+  ann_info: # Ann_Type : Ann_Dir, Ann_Ext
+    Gland:
+      ann_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Labels_Gland/'
+      ann_ext: '.mat'
+      channel_code: ['INST', 'TYPE']
+  viz_info:
+    line_width: 12
+    inst_colour: [255, 255, 0, 0]
+    type_colour: {
+      0: [0, 0, 0, 0], 
+      1: [255, 255, 0, 0], 
+      2: [177, 52, 235, 0]
+    }
+    type_names:
+      ['nolabel', 'gland', 'surface-epi']
+
+lumen:
+  img_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Images/'
+  img_ext: '.png' # can also be a list of extension
+  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/'
+  msk_ext: '.png'
+  split_info: '/root/lsf_workspace/train_data/mtl/info/info_lumen.csv'
+  nr_splits: 3
+  ann_info: # Ann_Type : Ann_Dir, Ann_Ext
+    Lumen:
+      ann_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Labels_Lumen/'
+      ann_ext: '.mat'
+      channel_code: ['INST']
+  viz_info:
+    line_width: 12
+    inst_colour: [255, 0, 255, 0]
+    type_colour: {
+      0: [0, 0, 0, 0], 
+      1: [131, 235, 52, 0], 
+    }
+    type_names:
+      ['nolabel', 'lumen']
+
+nuclei:
+  img_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Images/'
+  img_ext: '.png' # can also be a list of extension
+  msk_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Tissue/'
+  msk_ext: '.png'
+  split_info: '/root/lsf_workspace/train_data/mtl/info/info_nuclei.csv'
+  nr_splits: 3
+  ann_info: 
+    Nuclei:
+      ann_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Labels/'
+      ann_ext: '.mat'
+      channel_code: ['INST', 'TYPE']
+  viz_info:
+    line_width: 3
+    inst_colour: [0, 255, 0, 1]
+    type_colour: {
+      0: [0, 0, 0, 1],
+      1: [0, 0, 255, 1],
+      2: [0, 255, 0, 1],
+      3: [255, 0, 255, 1],
+      4: [176, 244, 230, 1],
+      5: [0, 191, 255, 1],
+      6: [255, 165, 0, 1]
+    }
+    type_names:
+      ['nolabel', 'neutrophil', 'epithelial', 'lymphocyte', 'plasma', 'eosinophil', 'connective']
