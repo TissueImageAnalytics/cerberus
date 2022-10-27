@@ -1,0 +1,14 @@
+.vscode
+*__pycache__
+
+# directories
+cache/
+dataset/
+pretrained_weights/
+
+# files
+*.npz
+*.png
+*.log
+*.dat
+*.csv
