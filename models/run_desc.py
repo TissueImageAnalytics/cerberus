@@ -1,30 +1,24 @@
 import numpy as np
+import copy
+import operator
 import matplotlib.pyplot as plt
+from functools import reduce
+
+from collections import OrderedDict
+    
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from models.utils.loss_utils import dice_loss, xentropy_loss
-from misc.utils import cropping_center
+from misc.utils import center_pad_to_shape, cropping_center
+from run_utils.callbacks import BaseCallbacks
 
-from collections import OrderedDict
 
-
-# def get_class_wmap(wmap):
-#     wmap_copy = torch.clone(wmap).detach()
-#     wmap_copy[wmap == 1] = 12
-#     wmap_copy[wmap == 2] = 1
-#     wmap_copy[wmap == 3] = 2
-#     wmap_copy[wmap == 4] = 6
-#     wmap_copy[wmap == 5] = 12
-#     wmap_copy[wmap == 6] = 2
-
-#     return wmap_copy
-
-def get_class_wmap(wmap):
+def get_class_wmap(wmap, weights):
     wmap_copy = torch.clone(wmap).detach()
-    wmap_copy[wmap == 1] = 1
-    wmap_copy[wmap == 2] = 1
+    for class_val, class_weight in weights.items():
+        wmap_copy[wmap == class_val] = class_weight
     return wmap_copy
 
 
@@ -40,7 +34,7 @@ def train_step(batch_data, run_info):
     model = run_info["net"]["desc"]
     optimizer = run_info["net"]["optimizer"]
 
-    # ! assume batch data is of the form
+    #* assume batch data is of the form
     # {
     #   'img' : Tensor, NxHWC
     #   'dummy_target'  : Tensor, NxB   # indicate which GT each sample has and at the
@@ -51,19 +45,11 @@ def train_step(batch_data, run_info):
     #   'Branch etc' : Tensor
     # }
 
-    ####
     img_list = batch_data.pop("img")
     input_dims = img_list.shape[1:3]
     # 0 value is not a target but is a dummy array
     has_target_list = batch_data.pop("dummy_target")
     true_dict = batch_data
-
-    # if "Patch-Class" in has_target_list:
-    #     is_pclass = True
-    # else:
-    #     is_pclass = False
-
-    is_pclass = False
 
     batch_size = img_list.shape[0]
 
@@ -80,22 +66,22 @@ def train_step(batch_data, run_info):
     #### *
     tgt_name_list = np.unique(has_target_list[has_target_list != None])
     dec_head_list = list(model.module.decoder_head.keys())
+    
     # check which branch should be trained basing on the GT available within the batch
     train_dec_list = [
         dec_head_name
         for dec_head_name in dec_head_list
         if np.any([dec_head_name in x for x in tgt_name_list])
     ]
-    tgt_name_list = list(
-        tgt_name_list
-    )  # convert back to list for index retrieval later
+    tgt_name_list = list(tgt_name_list) # convert back to list for index retrieval later
 
     #### *
     model.train()
     model.zero_grad()  # not rnn so not accumulate
 
-    # # ! freeze weight without using with block
-    model.module._freeze_weight()
+    # ! freeze model weights for object subtyping (see net_desc.py)
+    if model.module.subtype_gland or model.module.subtype_nuclei:
+        model.module._freeze_weight()
 
     pred_dict = model(img_list, train_dec_list)
 
@@ -104,15 +90,15 @@ def train_step(batch_data, run_info):
 
     all_loss = 0
     for head_name, head_pred in pred_dict.items():
-        # ! we know the protocol is that each col correspond to 1 target anyways,
+        # ! we know the protocol is that each col correspond to 1 target,
         # ! so any check will show which sample has target or not
         head_flag = np.any(has_target_list == head_name, axis=-1)
         head_flag = torch.from_numpy(head_flag.astype(np.float32)).to("cuda")
 
         if head_name == "Gland-TYPE":
-            nr_classes = 3
+            nr_classes = model.module.decoder_info_list["Gland#TYPE"]["TYPE"]
         elif head_name == "Nuclei-TYPE":
-            nr_classes = 7
+            nr_classes = model.module.decoder_info_list["Nuclei#TYPE"]["TYPE"]
 
         sample_true_list = true_dict[head_name]
         sample_pred_list = pred_dict[head_name]
@@ -127,23 +113,23 @@ def train_step(batch_data, run_info):
             if sample_wmap_name in true_dict:
                 sample_wmap = true_dict[sample_wmap_name]
             else:
-                sample_wmap = torch.ones_like(
-                    sample_true_list
-                )  # ! may have problem between NCHW and NHW
+                # ! may have problem between NCHW and NHW
+                sample_wmap = torch.ones_like(sample_true_list)  
 
             if head_name == "Nuclei-TYPE" or head_name == "Gland-TYPE":
-                # only compute loss within nuclei for type classification
+                class_weights = loss_opts["class_weight"][head_name]
+                # only compute loss within nuclei/gland for type classification
                 binary_map = torch.clone(sample_true_list).detach()
                 binary_map = (binary_map > 0).type(torch.float32) * 1.0  # binarize
-                sample_wmap = get_class_wmap(sample_true_list)
+                sample_wmap = get_class_wmap(sample_true_list, class_weights)
 
             if head_name == "Patch-Class":
                 sample_true_list = torch.squeeze(sample_true_list)
                 sample_pred_list = torch.squeeze(sample_pred_list)
 
             head_all_loss = 0
-            head_loss_dict = loss_opts[head_name]["loss"]
-            head_loss_weight = loss_opts[head_name]["weight"]
+            head_loss_dict = loss_opts["loss_info"][head_name]["loss"]
+            head_loss_weight = loss_opts["loss_info"][head_name]["weight"]
             for loss_name, loss_weight in head_loss_dict.items():
                 loss_func = loss_func_dict[loss_name]
                 if loss_name == "dice":
@@ -183,8 +169,6 @@ def train_step(batch_data, run_info):
     # * gradient update
     all_loss.backward()
     optimizer.step()
-
-    #### * pick 2 random sample from the batch for visualization
 
     proc_func_dict = {
         "Lumen-INST": lambda x: torch.softmax(x, -1)[..., 1:],
@@ -227,7 +211,7 @@ def train_step(batch_data, run_info):
         sub_pred_dict[head_name] = head_output_pred.detach().cpu().numpy()
 
         head_output_true = true_dict[head_name][sample_indices]
-        if is_pclass:
+        if head_name == "Patch-Class":
             head_output_true = F.interpolate(
                 head_output_true.type(torch.float32), size=input_dims, mode="nearest"
             )
@@ -241,10 +225,6 @@ def train_step(batch_data, run_info):
         "pred": sub_pred_dict,
     }
     return result_dict
-
-
-####
-from misc.utils import center_pad_to_shape, cropping_center
 
 
 def viz_step_output(raw_data, value_range=None, align_mode="max"):
@@ -350,15 +330,12 @@ def viz_step_output(raw_data, value_range=None, align_mode="max"):
     return viz_list
 
 
-####
 def valid_step(batch_data, run_info):
     # TODO: synchronize the attach protocol
     run_info, state_info = run_info
-
-    ####
     model = run_info["net"]["desc"]
 
-    # ! assume batch data is of the form
+    #* assume batch data is of the form
     # {
     #   'img' : Tensor, NxHWC
     #   'dummy_target'  : Tensor, NxB   # indicate which GT each sample has and at the
@@ -369,20 +346,11 @@ def valid_step(batch_data, run_info):
     #   'Branch etc' : Tensor
     # }
 
-    ####
-
     img_list = batch_data.pop("img")
     input_dims = img_list.shape[1:3]
     # 0 value is not a target but is a dummy array
     has_target_list = batch_data.pop("dummy_target")
     true_dict = batch_data
-
-    # if "Patch-Class" in has_target_list:
-    #     is_pclass = True
-    # else:
-    #     is_pclass = False
-
-    is_pclass = False
 
     batch_size = img_list.shape[0]
     img_list = img_list.to("cuda").type(torch.float32)  # to NCHW
@@ -432,7 +400,6 @@ def valid_step(batch_data, run_info):
 
         head_output_pred = proc_func_dict[head_name](head_output)
         if head_name == "Patch-Class":
-
             head_output_pred = F.interpolate(
                 head_output_pred.type(torch.float32), size=input_dims, mode="nearest"
             )
@@ -441,27 +408,31 @@ def valid_step(batch_data, run_info):
 
         head_output_true = true_dict[head_name]
 
-        if is_pclass:
+        if head_name == "Patch-Class":
             head_output_true = F.interpolate(
                 head_output_true.type(torch.float32), size=input_dims, mode="nearest"
             )
+        
         head_output_true = torch.squeeze(head_output_true)
         sub_true_dict[head_name] = head_output_true.detach().cpu().numpy()
 
-    # * Its up to user to define the protocol to process the raw output per step!
+    # number of output channels per task- defined in paramset.yml
+    channel_info = model.module.decoder_info_list
+
+    # * up to user to define the protocol to process the raw output per step!
     result_dict = {
         "raw": {  # protocol for contents exchange within `raw`
             "img": img_list,
             "true": sub_true_dict,
             "pred": sub_pred_dict,
             "dummy": has_target_list,
+            "channel_info": channel_info,
         }
     }
     return result_dict
 
 
 def infer_step(img_list, model, output_shape):
-    ####
     img_list = img_list.to("cuda").type(torch.float32)  # to NCHW
     img_list = img_list.permute(0, 3, 1, 2).contiguous()
 
@@ -492,7 +463,7 @@ def infer_step(img_list, model, output_shape):
         [[k, v.permute(0, 2, 3, 1).contiguous()] for k, v in pred_dict.items()]
     )
 
-    #! Should make sure this is in the same order as in settings.yml
+    #! Should make sure this is in the same order as settings.yml
     head_name_list = [
         "Gland-INST",
         "Gland-TYPE",
@@ -537,9 +508,6 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
     def track_value(name, value, vtype):
         return track_dict[vtype].update({name: value})
 
-    from functools import reduce
-    import operator
-
     def get_from_nested_dict(nested_dict, nested_key_list):
         return reduce(operator.getitem, nested_key_list, nested_dict)
 
@@ -563,14 +531,16 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
     ####
     cum_stat_dict = epoch_data[1]
 
-    # all_acc = []
-    # all_dice = []
     for target_name, cum_stat in cum_stat_dict.items():
         if "INST" in target_name:
             for k, v in cum_stat.items():
                 accu, dice = summarize_stats(v)
                 track_value(f"{target_name}-{k}-accu", accu, "scalar")
                 track_value(f"{target_name}-{k}-dice", dice, "scalar")
+                #* print stats to terminal
+                print()
+                print(f"{target_name}-{k}-accu", accu)
+                print(f"{target_name}-{k}-dice", dice)
         elif "TYPE" in target_name:
             accu_list = []
             dice_list = []
@@ -579,7 +549,6 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
                 accu_list.append(accu)
                 dice_list.append(dice)
                 track_value(f"{target_name}-{k}-dice", dice, "scalar")
-                # track_value(f"{target_name}-accu", accu, "scalar")
             track_value(f"{target_name}-avg-accu", np.mean(accu_list), "scalar")
             track_value(f"{target_name}-avg-dice", np.mean(dice_list), "scalar")
         else:
@@ -590,13 +559,8 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
                 accu_list.append(accu)
                 dice_list.append(dice)
                 track_value(f"{target_name}-{k}-dice", dice, "scalar")
-                # track_value(f"{target_name}-accu", accu, "scalar")
             track_value(f"{target_name}-all-accu", np.mean(accu_list), "scalar")
             track_value(f"{target_name}-avg-dice", np.mean(dice_list), "scalar")
-
-    # calculate average dice score for foreground prediction
-    # track_value("avg-accu", sum(all_acc) / len(all_acc), "scalar")
-    # track_value("avg-dice", sum(all_dice) / len(all_dice), "scalar")
 
     ####
     sampled_raw_data = epoch_data[0]
@@ -614,8 +578,6 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
         true_list = flatten_dict_hierarchy(["true", target_name], sampled_raw_data)
         pred_dict[target_name] = pred_list
         true_dict[target_name] = pred_list
-
-    #### pick random samples from the batch for visualization
 
     # * pick 1 random sample from the batch for visualization
     nr_sel_sample = 1
@@ -639,13 +601,8 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
 
 
 ####
-import copy
-from run_utils.callbacks import BaseCallbacks
-
-
 class ProcStepRawOutput(BaseCallbacks):
     def run(self, state, event):
-        ####
         def _dice_info(true, pred, label, mask=None):
             true = np.array(true == label, np.int32)
             pred = np.array(pred == label, np.int32)
@@ -675,11 +632,7 @@ class ProcStepRawOutput(BaseCallbacks):
 
             return cum_dict
 
-        def get_batch_stat(patch_pred, patch_true, cum_dict, target_name):
-            #! hard-coded -> need to think where to get number of types
-            nr_types_dict = {"Gland": 3, "Nuclei": 7, "Patch": 9}
-            nr_inst_dict = {"Gland": 3, "Nuclei": 3, "Lumen": 3}
-
+        def get_batch_stat(patch_pred, patch_true, cum_dict, target_name, channel_info):
             patch_true = np.squeeze(patch_true)  # ! may be wrong for n=1
             patch_pred = np.squeeze(patch_pred)
             n, h, w = patch_pred.shape[:3]
@@ -687,10 +640,9 @@ class ProcStepRawOutput(BaseCallbacks):
             patch_target_flag = np.any(step_dummy == target_name, axis=-1).astype(
                 np.float32
             )
-
             target_split = target_name.split("-")
             if target_split[-1] == "INST":
-                nr_inst_types = nr_inst_dict[target_split[0]]
+                nr_inst_types = channel_info[target_split[0]]["INST"]
                 for idx in range(1, nr_inst_types):
                     patch_pred_ = np.array(
                         patch_pred[..., idx - 1] > 0.5, dtype=np.int32
@@ -706,7 +658,7 @@ class ProcStepRawOutput(BaseCallbacks):
                     )
             elif target_split[-1] == "TYPE":
                 mask = patch_true > 0
-                nr_types = nr_types_dict[target_split[0]]
+                nr_types = channel_info[f"{target_split[0]}#TYPE"]["TYPE"]
                 # don't consider background
                 for idx in range(1, nr_types):
                     cum_dict[idx] = _batch_stats(
@@ -719,7 +671,8 @@ class ProcStepRawOutput(BaseCallbacks):
                         mask=mask,
                     )
             else:
-                nr_types = nr_types_dict[target_split[0]]
+                # patch classification
+                nr_types = channel_info[f"{target_split[0]}-Class"]["OUT"]
                 for idx in range(nr_types):
                     cum_dict[idx] = _batch_stats(
                         patch_true,
@@ -729,16 +682,17 @@ class ProcStepRawOutput(BaseCallbacks):
                         patch_size,
                         label_value=idx,
                     )
-
+                    
             return cum_dict
 
         step_output = state.step_output["raw"]
         step_pred_output = step_output["pred"]
         step_true_output = step_output["true"]
         step_dummy = step_output["dummy"]
+        channel_info = step_output["channel_info"]
         target_name_list = list(step_pred_output.keys())
         # ! assume that target_name_list and step_dummy
-        # ! are in the same ordering !
+        # ! are in the same order !
 
         state_cum_output = state.epoch_accumulated_output
         # custom init and protocol
@@ -748,26 +702,21 @@ class ProcStepRawOutput(BaseCallbacks):
 
             step_cum_stat_dict = {}
             for target_name in target_name_list:
+                target_base = target_name.split('-')[0]
                 if "INST" in target_name:
-                    NUM_CLASSES = 3
+                    NUM_CLASSES = channel_info[target_base]["INST"]
                     step_cum_stat_dict[target_name] = {
                         type_id: copy.deepcopy(template_stat_dict)
                         for type_id in range(1, NUM_CLASSES)
                     }
                 elif "TYPE" in target_name:
-                    if target_name == 'Nuclei-TYPE':
-                        NUM_CLASSES = 7
-                    elif target_name == 'Gland-TYPE':
-                        NUM_CLASSES = 3
-                    else:
-                        raise ValueError('target name not recognised')
-
+                    NUM_CLASSES = channel_info[f"{target_base}#TYPE"]["TYPE"]
                     step_cum_stat_dict[target_name] = {
                         type_id: copy.deepcopy(template_stat_dict)
                         for type_id in range(1, NUM_CLASSES)
                     }
                 elif "Patch-Class" in target_name:
-                    NUM_CLASSES = 9  # ! HACK: hardcoded for now
+                    NUM_CLASSES = channel_info[f"{target_base}-Class"]["OUT"]
                     step_cum_stat_dict[target_name] = {
                         type_id: copy.deepcopy(template_stat_dict)
                         for type_id in range(NUM_CLASSES)
@@ -776,7 +725,6 @@ class ProcStepRawOutput(BaseCallbacks):
             state_cum_output = [[], step_cum_stat_dict]
             state.epoch_accumulated_output = state_cum_output
         state_cum_output = state.epoch_accumulated_output
-        #
 
         # edit by reference also, variable is a reference, not a deep copy
         step_cum_stat_dict = state_cum_output[1]
@@ -786,16 +734,11 @@ class ProcStepRawOutput(BaseCallbacks):
                 step_true_output[target_name],
                 step_cum_stat_dict[target_name],
                 target_name,
+                channel_info
             )
             step_cum_stat_dict[target_name] = new_cum_dict
 
-        # accumulate the batch basing on % such that not all dataset is stored
-        # this will be useful for viz later
-        # if np.random.uniform(0.1, 1.0) <= 0.01:
-        #     state_cum_output[0].append(step_output)
-        #     state_cum_output[1] = step_cum_stat_dict
-
-        # ! for debugging
+        #! for debugging
         state_cum_output[0].append(step_output)
         state_cum_output[1] = step_cum_stat_dict
 

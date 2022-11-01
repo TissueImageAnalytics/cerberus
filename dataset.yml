@@ -9,7 +9,7 @@
 gland:
   img_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Images/'
   img_ext: '.png' # can also be a list of extension
-  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/'
+  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/' # only extract patches within tissue area
   msk_ext: '.png'
   split_info: '/root/lsf_workspace/train_data/mtl/info/info_gland.csv'
   nr_splits: 3
@@ -32,7 +32,7 @@ gland:
 lumen:
   img_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Images/'
   img_ext: '.png' # can also be a list of extension
-  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/'
+  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/' # only extract patches within tissue area
   msk_ext: '.png'
   split_info: '/root/lsf_workspace/train_data/mtl/info/info_lumen.csv'
   nr_splits: 3
@@ -54,7 +54,7 @@ lumen:
 nuclei:
   img_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Images/'
   img_ext: '.png' # can also be a list of extension
-  msk_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Tissue/'
+  msk_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Tissue/' # only extract patches within tissue area
   msk_ext: '.png'
   split_info: '/root/lsf_workspace/train_data/mtl/info/info_nuclei.csv'
   nr_splits: 3

@@ -131,7 +131,7 @@ class PatchSegDataset(torch.utils.data.Dataset):
                     iaa.Lambda(seed=rng, func_images=lambda *args: median_blur(*args, max_ksize=3)),
                     iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5)
                     ]),
-                # apply color augmentation 90% of time
+                # apply colour augmentation 90% of time
                 iaa.Sometimes(0.90,iaa.Sequential([
                     iaa.Lambda(seed=rng, func_images=lambda *args: add_to_hue(*args, range=(-8, 8))),
                     iaa.Lambda(seed=rng, func_images=lambda *args: add_to_saturation(*args, range=(-0.2, 0.2))),
@@ -151,6 +151,7 @@ class PatchSegDataset(torch.utils.data.Dataset):
             input_augs = []
 
         return shape_augs, input_augs
+    
 
 class PatchClassDataset(torch.utils.data.Dataset):
     """Loads images from a file list and
@@ -354,8 +355,6 @@ class PatchSegClassDataset(torch.utils.data.Dataset):
 
         feed_dict = OrderedDict([["img", img]])
 
-        # TODO: document hard coded assumption about #
-        # TODO: expose weight to feed augmentention or GT gen opt
         target_dict, has_flag = gen_targets(
             ann,
             ann_ch_code,
@@ -366,8 +365,7 @@ class PatchSegClassDataset(torch.utils.data.Dataset):
         )
         feed_dict.update(target_dict)
         feed_dict["dummy_target"] = np.array(has_flag)
-
-        # feed_dict['idx'] = np.array(idx)
+        
         return feed_dict
 
     def __get_augmentation(self, mode, task_mode, rng):
@@ -430,7 +428,7 @@ class PatchSegClassDataset(torch.utils.data.Dataset):
                     iaa.Lambda(seed=rng, func_images=lambda *args: median_blur(*args, max_ksize=3)),
                     iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5)
                     ]),
-                # apply color augmentation 90% of time
+                # apply colour augmentation 90% of time
                 iaa.Sometimes(0.90,iaa.Sequential([
                     iaa.Lambda(seed=rng, func_images=lambda *args: add_to_hue(*args, range=(-8, 8))),
                     iaa.Lambda(seed=rng, func_images=lambda *args: add_to_saturation(*args, range=(-0.2, 0.2))),
@@ -448,13 +446,6 @@ class PatchSegClassDataset(torch.utils.data.Dataset):
                         self.input_shape[0], self.input_shape[1], position="center"
                     ),]
             else:
-                # shape_augs = [
-                #     iaa.PadToFixedSize(
-                #         self.input_shape[0],
-                #         self.input_shape[1],
-                #         pad_mode='reflect',
-                #         position="center")
-                # ]
                 shape_augs = [
                     iaa.CropToFixedSize(
                         self.input_shape[0], self.input_shape[1], position="center")
@@ -466,7 +457,7 @@ class PatchSegClassDataset(torch.utils.data.Dataset):
 class MyConcatDataset(torch.utils.data.dataset.ConcatDataset):
     def setup_augmentor(self, worker_id, seed):
         for sub_ds in self.datasets:
-            # will modify the reference so dont need to reassign,
+            # will modify the reference so dont need to reassign
             sub_ds.setup_augmentor(worker_id, seed)
         return
 

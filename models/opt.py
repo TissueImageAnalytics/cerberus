@@ -21,8 +21,9 @@ from .run_desc import (
 )
 
 # __PER_N_STEPS = 3000 # mtl
-# __PER_N_STEPS = 400 # nuc-class
-__PER_N_STEPS = 800 # nuc-class
+# __PER_N_STEPS = 800 # nuc-class
+
+__PER_N_STEPS = 3 
 
 def get_config(
     train_loader_list,
@@ -73,8 +74,8 @@ def get_config(
                     },
                 },
                 "loader": loader_kwargs,
-                # "nr_epochs": 140,
-                "nr_epochs": 800,
+                "nr_epochs": 140,
+                # "nr_epochs": 800,
             },
         ],
         # ------------------------------------------------------------------
@@ -101,14 +102,6 @@ def get_config(
                         ),
                         ScheduleLr(),
                     ],
-                    # Events.EPOCH_COMPLETED: [
-                    #     TrackLr(),
-                    #     PeriodicSaver(),
-                    #     VisualizeOutput(viz_step_output, per_n_epoch=1),
-                    #     LoggingEpochOutput(),
-                    #     TriggerEngine('infer'),
-                    #     ScheduleLr(),
-                    # ]
                 },
             },
             "infer": {
@@ -118,7 +111,6 @@ def get_config(
                 # callbacks are run according to the list order of the event
                 "callbacks": {
                     Events.STEP_COMPLETED: [
-                        # AccumulateRawOutput(),
                         ProcStepRawOutput()
                     ],
                     Events.EPOCH_COMPLETED: [

@@ -25,19 +25,22 @@ class NetDesc(nn.Module):
         encoder_backbone_name=None,
         backbone_imagenet_pretrained=False,
         fullnet_custom_pretrained=False,  
-        freeze_encoder=True,
-        inst_class_mode=True,
-        # each decoder branch may have multiple end clf
         decoder_kwargs={},
+        considered_tasks=[],
+        subtype_gland=False,
+        subtype_nuclei=False,
     ):
         super().__init__()
 
+        # build network depending on which tasks are considered
+        self.considered_tasks = considered_tasks 
+        self.subtype_gland = subtype_gland # whether to freeze all weights apart from gland semantic seg decoder
+        self.subtype_nuclei = subtype_nuclei # whether to freeze all weights apart from nuclei semantic seg decoder
+        
         self.encoder_backbone_name = encoder_backbone_name
         self.net_code = encoder_backbone_name[:3]
 
-        self.freeze_encoder = freeze_encoder
         self.decoder_info_list = decoder_kwargs
-        self.inst_class_mode = inst_class_mode
 
         #========= Get Encoder =========
         self.backbone, filters, self.gspace_info = get_backbone(
@@ -56,30 +59,32 @@ class NetDesc(nn.Module):
         #========= Get Decoders =========
 
         for decoder_name, output_head in self.decoder_info_list.items():
-            if decoder_name == "Patch-Class":
-                self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-                for output_name, output_ch in output_head.items():
-                    module_list = [
-                        ("bn1", nn.BatchNorm2d(512, eps=1e-5)),
-                        ("relu1", nn.ReLU(inplace=True)),
-                        ("dropout", nn.Dropout(p=0.3)),
-                        ("conv1", nn.Conv2d(512, 256, 1, stride=1, padding=0)),
-                        ("bn2", nn.BatchNorm2d(256, eps=1e-5)),
-                        ("relu2", nn.ReLU(inplace=True)),
-                        ("conv2", nn.Conv2d(256, output_ch, 1, stride=1, padding=0, bias=True))
-                        ]
-                    self.decoder_head["Patch-Class"] = nn.Sequential(OrderedDict(module_list))
-            else:
-                up_blk_list = get_decoder(encoder_backbone_name, self.decoder_info)
-                decoder_list = nn.ModuleList(up_blk_list)
-                self.decoder_head[decoder_name] = decoder_list
-                decoder_output_head = nn.ModuleDict()
-                for output_name, output_ch in output_head.items():
-                    clf = get_classification_head(
-                        encoder_backbone_name, filters, out_ch=output_ch
-                    )
-                    decoder_output_head[output_name] = clf
-                self.output_head[decoder_name] = decoder_output_head
+            # only build the network for tasks being considered
+            if decoder_name in self.considered_tasks:
+                if decoder_name == "Patch-Class":
+                    self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+                    for output_name, output_ch in output_head.items():
+                        module_list = [
+                            ("bn1", nn.BatchNorm2d(512, eps=1e-5)),
+                            ("relu1", nn.ReLU(inplace=True)),
+                            ("dropout", nn.Dropout(p=0.3)),
+                            ("conv1", nn.Conv2d(512, 256, 1, stride=1, padding=0)),
+                            ("bn2", nn.BatchNorm2d(256, eps=1e-5)),
+                            ("relu2", nn.ReLU(inplace=True)),
+                            ("conv2", nn.Conv2d(256, output_ch, 1, stride=1, padding=0, bias=True))
+                            ]
+                        self.decoder_head["Patch-Class"] = nn.Sequential(OrderedDict(module_list))
+                else:
+                    up_blk_list = get_decoder(encoder_backbone_name, self.decoder_info)
+                    decoder_list = nn.ModuleList(up_blk_list)
+                    self.decoder_head[decoder_name] = decoder_list
+                    decoder_output_head = nn.ModuleDict()
+                    for output_name, output_ch in output_head.items():
+                        clf = get_classification_head(
+                            encoder_backbone_name, filters, out_ch=output_ch
+                        )
+                        decoder_output_head[output_name] = clf
+                    self.output_head[decoder_name] = decoder_output_head
                 
         #======= Initialise Weights =======
         if self.net_code != "dsf":
@@ -127,12 +132,13 @@ class NetDesc(nn.Module):
             else:
                 decoder_output_head = self.output_head[decoder_name]
                 for head_name, head in decoder_output_head.items():
-                    # if head_name != 'TYPE':
-                    #     _freeze(decoder)
-                    #     _freeze(head)
-                    if decoder_name != 'Gland#TYPE':
+                    if head_name != 'TYPE':
                         _freeze(decoder)
                         _freeze(head)
+                    else:
+                        if (decoder_name == "Gland#TYPE" and not self.subtype_gland) or (decoder_name == "Nuclei#TYPE" and not self.subtype_nuclei):
+                            _freeze(decoder)
+                            _freeze(head)
         return
 
     def forward(self, imgs, train_decoder_list=[]):
@@ -152,8 +158,13 @@ class NetDesc(nn.Module):
             # allow freezing decoder branch basing on name alone, dynamically
             # within training schedule (such as alternate between batch)
             decoder_train_flag = decoder_name in train_decoder_list
-            if self.inst_class_mode:
+
+            # no gradient if using subtype mode - only train relevant decoders!
+            if "TYPE" not in decoder_name:
                 decoder_train_flag = False
+            else:
+                if ("Gland" in decoder_name and not self.subtype_gland) or ("Nuclei" in decoder_name and not self.subtype_nuclei):
+                    decoder_train_flag = False
 
             if decoder_name == "Patch-Class":
                 with torch.set_grad_enabled(decoder_train_flag):
@@ -165,28 +176,26 @@ class NetDesc(nn.Module):
                     if self.net_code == "dsf":
                         prev_feat = group_pool_layer(
                             self.encoder_backbone_name, self.decoder_info[-1])(prev_feat)
-                        if self.net_code == "wrn":
-                            prev_feat = prev_feat.tensor
                     output = self.decoder_head["Patch-Class"](prev_feat)
                     output_dict[decoder_name] = output
             else:
-                # with torch.set_grad_enabled(decoder_train_flag):
-                prev_feat = feat_list[-1]
-                for idx in range(1, len(feat_list)):
-                    prev_feat = upsample2x(
-                        prev_feat, self.net_code, self.decoder_info[-(idx+1)])
-                    down_feat = feat_list[-(idx + 1)]
-                    new_feat = down_feat + prev_feat
-                    prev_feat = blk_list[idx - 1](new_feat)
+                with torch.set_grad_enabled(decoder_train_flag):
+                    prev_feat = feat_list[-1]
+                    for idx in range(1, len(feat_list)):
+                        prev_feat = upsample2x(
+                            prev_feat, self.net_code, self.decoder_info[-(idx+1)])
+                        down_feat = feat_list[-(idx + 1)]
+                        new_feat = down_feat + prev_feat
+                        prev_feat = blk_list[idx - 1](new_feat)
 
-                if self.net_code == "dsf":
-                    prev_feat = group_pool_layer(
-                        self.encoder_backbone_name, self.decoder_info[0])(prev_feat)
+                    if self.net_code == "dsf":
+                        prev_feat = group_pool_layer(
+                            self.encoder_backbone_name, self.decoder_info[0])(prev_feat)
 
-                decoder_output_head = self.output_head[decoder_name]
-                for clf_name, clf in decoder_output_head.items():
-                    output = clf(prev_feat)
-                    output_dict[decoder_name.split('#')[0] + "-" + clf_name] = output
+                    decoder_output_head = self.output_head[decoder_name]
+                    for clf_name, clf in decoder_output_head.items():
+                        output = clf(prev_feat)
+                        output_dict[decoder_name.split('#')[0] + "-" + clf_name] = output
 
         return output_dict
 

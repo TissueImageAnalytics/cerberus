@@ -71,7 +71,6 @@ class InferManager(base.InferManager):
 
         prob_list = np.concatenate(prob_list, axis=0)
         true_list = np.array(true_list)
-io
 
         # give the metrics
         from sklearn import metrics

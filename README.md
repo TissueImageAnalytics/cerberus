@@ -2,7 +2,9 @@
 
 This repository contains code for using Cerberus, our multi-task model outlined in our [preprint](https://arxiv.org/abs/2203.00077).
 
-**WARNING:** THE REPOSITORY IS DUE FOR COMPLETION BY NOV 19TH 2022.
+Scroll down the README to also find instructions on downloading our pretrained ResNet encoder and WSI-level results.
+
+**WARNING:** THE REPOSITORY IS DUE FOR COMPLETION BY NOVEMBER 19TH 2022.
 
 ## Set Up Environment
 

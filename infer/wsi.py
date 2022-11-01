@@ -4,7 +4,6 @@ from multiprocessing import Lock
 
 mp.set_start_method("spawn", True)  # ! must be at top for VScode debugging
 
-import math
 import os
 import pathlib
 import sys
@@ -32,8 +31,7 @@ from loader.postproc import (
     PostProcInstErodedMap,
     get_inst_info_dict,
 )
-from misc.utils import get_bounding_box, log_info, rm_n_mkdir, save_json
-from convert_wsi.convert import convert_jp2_tiff
+from misc.utils import get_bounding_box, rm_n_mkdir
 
 from shapely.geometry import box as shapely_box
 from shapely.strtree import STRtree
@@ -46,7 +44,6 @@ from tiatoolbox.models import (
 )
 from tiatoolbox.models.architecture.hovernet import HoVerNet
 from tiatoolbox.wsicore.wsireader import get_wsireader, VirtualWSIReader
-from tiatoolbox.wsicore.wsimeta import WSIMeta
 
 from . import base
 
@@ -145,7 +142,6 @@ def _process_tile_predictions(
 
     tile_shape = tile_br - tile_tl  # in width height
 
-    # !
     inst_ptr = np.load(cache_inst_path, mmap_mode="r")
     type_ptr = np.load(cache_type_path, mmap_mode="r")
     inst_ptr = inst_ptr[tile_tl[1] : tile_br[1], tile_tl[0] : tile_br[0]]
@@ -182,7 +178,7 @@ def _process_tile_predictions(
         shapely_box(0, 0, m, h),  # noqa left
         shapely_box(w - m, 0, w, h),  # noqa right
     ]
-    # ! this is wrt to WSI coord space, not tile
+    # ! this is wrt to WSI coordinate space, not tile
     margin_lines = [
         [[m, m], [w - m, m]],  # noqa top egde
         [[m, h - m], [w - m, h - m]],  # noqa bottom edge
@@ -231,7 +227,7 @@ def _process_tile_predictions(
         raise ValueError(f"Unknown tile mode {tile_mode}.")
 
     def retrieve_sel_uids(sel_indices, inst_dict):
-        """Helper to retrieved selected instance uids."""
+        """Helper function to retrieve selected instance uids."""
         sel_uids = []
         if len(sel_indices) > 0:
             # not sure how costly this is in large dict
@@ -249,7 +245,7 @@ def _process_tile_predictions(
         inst_boxes = np.array(inst_boxes)
 
         geometries = [shapely_box(*bounds) for bounds in inst_boxes]
-        # An auxiliary dictionary to actually query the index within the source list
+        # an auxiliary dictionary to actually query the index within the source list
         index_by_id = {id(geo): idx for idx, geo in enumerate(geometries)}
         ref_inst_rtree = STRtree(geometries)
         sel_indices = [
@@ -393,7 +389,7 @@ class InferManager(base.InferManager):
         return tissue_info
 
     def _get_resized_map(self, mmap_path, ds_factor, read_size):
-        """Resize an image tile by tile and then merge together. Convenient for large
+        """Resize an image tile-by-tile and then merge together. Convenient for large
         arrays that otherwise may result in memory errors when resizing the entire array."""
 
         read_size = [read_size, read_size]
@@ -430,7 +426,7 @@ class InferManager(base.InferManager):
                 resized_tmp = resized_pred_map[
                     new_coord[1] : new_coord[3], new_coord[0] : new_coord[2],
                 ]
-                # just to make sure nothing breaks!
+                # make sure nothing breaks!
                 if resized_tmp.shape != resize_tile_pred_map.shape:
                     resize_tile_pred_map = cv2.resize(
                         resize_tile_pred_map,
@@ -478,14 +474,12 @@ class InferManager(base.InferManager):
         def callback(new_inst_dict, remove_uuid_list):
             """Helper to aggregate worker's results."""
             # ! DEPRECATION:
-            # !     will be deprecated upon finalization of SQL annotation store
+            # ! will be deprecated upon finalization of SQL annotation store
             inst_dict.update(new_inst_dict)
             for inst_uuid in remove_uuid_list:
                 inst_dict.pop(inst_uuid, None)
-            # !
 
         for future in futures:
-
             #  not actually future but the results
             if not has_workers:
                 callback(*future)
@@ -516,7 +510,7 @@ class InferManager(base.InferManager):
             output_dir: path where output will be saved
 
         """
-        rm_n_mkdir(self.cache_path)
+        rm_n_mkdir(self.cache_path) # create caching location
 
         wsi_path = self.imgs[wsi_idx]
         mask_path = self.masks[wsi_idx]
@@ -526,21 +520,6 @@ class InferManager(base.InferManager):
         # converted to `baseline` for `tile` mode
         resolution = ioconfig.highest_input_resolution
         self.wsi_handler = get_wsireader(input_img=wsi_path)
-        
-        #! Below is when the metadata is missing - add it manually
-        # self.wsi_handler = OpenSlideWSIReader(input_img=wsi_path)
-        # tiff_metadata = self.wsi_handler.info
-
-        # new_info = WSIMeta(
-        #     slide_dimensions=tiff_metadata.slide_dimensions,
-        #     level_count=tiff_metadata.level_count,
-        #     level_downsamples=tiff_metadata.level_downsamples,
-        #     level_dimensions=tiff_metadata.level_dimensions,
-        #     axes="YXS",
-        #     objective_power=40.0,  # change this
-        #     mpp=(0.275, 0.275)
-        # )
-        # self.wsi_handler.info = new_info
 
         # in XY
         self.wsi_proc_shape = self.wsi_handler.slide_dimensions(**resolution)
@@ -554,7 +533,14 @@ class InferManager(base.InferManager):
         else:
             wsi_mask = np.ones(self.wsi_proc_shape, dtype=np.uint8)
         mask_downsample_ratio = wsi_mask.shape[0] / self.wsi_proc_shape[0]
-
+        
+        if self.save_mask:
+            cv2.imwrite(f"{self.output_dir}/mask/{wsi_basename}.png", self.wsi_mask*255)
+        if self.save_thumb:
+            # thumbnail at 1.25x objective magnification
+            wsi_thumb = self.slide_thumbnail(resolution=1.25, units="power") 
+            cv2.imwrite(f"{self.output_dir}/thumb/{wsi_basename}.png", wsi_thumb)
+            
         # warning, the value within this is uninitialized
         # cache merging map for each  head output
         fx_list = [v["resolution"] for v in ioconfig.output_resolutions]
@@ -578,7 +564,7 @@ class InferManager(base.InferManager):
             patch_outputs = patch_outputs[sel]
             patch_inputs = patch_inputs[sel]
 
-        # assume to be in [top_left_x, top_left_y, bot_right_x, bot_right_y]
+        # assumed to be [top_left_x, top_left_y, bot_right_x, bot_right_y]
         geometries = [shapely_box(*bounds) for bounds in patch_outputs]
         # An auxiliary dictionary to actually query the index within the source list
         index_by_id = {id(geo): idx for idx, geo in enumerate(geometries)}
@@ -630,7 +616,6 @@ class InferManager(base.InferManager):
                     cache_count_path=cache_count_paths[idx],
                     free_prediction=True,
                 )
-
 
         end = time.perf_counter()
         self.logger.info("Inference Time: {0}".format(end - start))
@@ -721,7 +706,7 @@ class InferManager(base.InferManager):
                 interpolation=cv2.INTER_NEAREST,
             )
             pclass_map *= lores_wsimask
-            del lores_wsimask
+            del lores_wsimask # free memory
             cv2.imwrite("%s/tissue/%s.png" % (output_dir, wsi_basename), pclass_map)
 
         end = time.perf_counter()
@@ -885,23 +870,6 @@ class InferManager(base.InferManager):
 
         self.num_loader_workers = 12
         self.num_postproc_workers = 6
-        # ioconfig = IOSegmentorConfig(
-        #     input_resolutions=[{"units": "mpp", "resolution": self.wsi_proc_mag}],
-        #     output_resolutions=[
-        #         {"units": "mpp", "resolution": self.wsi_proc_mag},
-        #         {"units": "mpp", "resolution": self.wsi_proc_mag},
-        #         {"units": "mpp", "resolution": self.wsi_proc_mag},
-        #         {"units": "mpp", "resolution": self.wsi_proc_mag},
-        #         {"units": "mpp", "resolution": self.wsi_proc_mag},
-        #         {"units": "mpp", "resolution": self.wsi_proc_mag},
-        #     ],
-        #     margin=128,
-        #     tile_shape=[4096, 4096],
-        #     patch_input_shape=[448, 448],
-        #     patch_output_shape=[144, 144],
-        #     stride_shape=[144, 144],
-        #     save_resolution={"units": "mpp", "resolution": self.wsi_proc_mag},
-        # )
 
         ioconfig = IOSegmentorConfig(
             input_resolutions=[{"units": "mpp", "resolution": self.wsi_proc_mag}],
@@ -931,7 +899,7 @@ class InferManager(base.InferManager):
             stride_shape=[144, 144],
             save_resolution={"units": "mpp", "resolution": self.wsi_proc_mag},
         )
-        # !
+    
         # workers should be > 0 else Value Error will be thrown
         self._postproc_workers = None
         self.num_postproc_workers = (

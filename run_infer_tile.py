@@ -4,8 +4,8 @@ Usage:
   run_infer_tile.py [--gpu=<id>] [--model_path=<path>] [--nr_inference_workers=<n>] \
             [--nr_post_proc_workers=<n>] [--batch_size=<n>] [--tile_shape=<n>] \
             [--input_dir=<path>] [--output_dir=<path>] [--patch_input_shape=<n>] [--patch_output_shape=<n>]
-  run_infer_wsi.py (-h | --help)
-  run_infer_wsi.py --version
+  run_infer_tile.py (-h | --help)
+  run_infer_tile.py --version
 
 Options:
   -h --help                   Show this string.
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir):
         rm_n_mkdir(output_dir)
 
-    run_root_dir = "pretrained_weights/resnet34_cerberus"
+    run_root_dir = "/root/lsf_workspace/pretrained/cerberus/resnet34_cerberus_test"
     checkpoint_path = "%s/resnet34_cerberus_cobi.tar" % run_root_dir
     with open("%s/settings.yml" % (run_root_dir)) as fptr:
         run_paramset = yaml.full_load(fptr)

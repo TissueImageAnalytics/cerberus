@@ -1,31 +1,36 @@
 """run.py 
 
 Usage:
-  run.py [--gpu=<id>] [--fold=<n>] [--logdir=<path>] [--exp_code=<str>] [--param_path=<path>] \
-      [--mix_target_in_batch] [--gland] [--gland_dir=<path>] [--lumen] [--lumen_dir=<path>] [--nuclei] \
-          [--nuclei_dir=<path>] [--pclass] [--pclass_dir=<path>] [--pretrained=<str>] [--pretrained_info=<path>] 
+  run.py [--gpu=<id>] [--fold=<n>] [--log_dir=<path>] [--exp_code=<str>] [--param_path=<path>] \
+      [--mix_target_in_batch] [--gland_inst] [--gland_class] [--gland_subtype] [--gland_dir=<path>] [--lumen_inst] \
+      [--lumen_dir=<path>] [--nuclei_inst] [--nuclei_class] [--nuclei_subtype] [--nuclei_dir=<path>] [--pclass] \
+      [--pclass_dir=<path>] [--pretrained=<str>] [--pretrained_info=<path>] 
   run.py (-h | --help)
   run.py --version
 
 Options:
   -h --help                     Show this string.
   --version                     Show version.
-  --gpu=<id>                    Comma separated GPU list. [default:0]       
-  --fold=<n>                    Fold number to train with. If not provided - assumes no fold info!
-  --log_dir=<path>              Path to directory where logs will be saved. [default:logs/]
-  --exp_code=<str>              Code given to training run. [default:v1.0]
-  --param_path=<path>           Path to file containing run setup. [default:models/paramset.yml]
+  --gpu=<id>                    Comma separated GPU list. [default: 0]       
+  --fold=<n>                    Fold number to train with. [default: 1]
+  --log_dir=<path>              Path to directory where logs will be saved. [default: logs/]
+  --exp_code=<str>              Code given to training run. [default: v1.0]
+  --param_path=<path>           Path to file containing run setup. [default: models/paramset.yml]
   --mix_target_in_batch         Whether to use mixed or fixed batch. Toggle on if want to mix!
-  --gland                       Whether gland segmentation task considered.
-  --gland_dir=<path>            Patch to where gland segmentation data is located. 
-  --lumen                       Whether lumen segmentation task is considered.
-  --lumen_dir=<path>            Patch to where lumen segmentation data is located.
-  --nuclei                      Whether nuclei segmentation task is considered.
-  --nuclei_dir=<path>           Patch to where gland segmentation data is located.
+  --gland_inst                  Whether gland instance segmentation task considered.
+  --gland_class                 Whether gland semantic segmentation (multi-task) task considered.
+  --gland_subtype               Freeze all weights except for gland semantic segmentation decoder.
+  --gland_dir=<path>            Patch to where gland segmentation data is located. [default: /root/lsf_workspace/train_data/mtl/patches/gland]
+  --lumen_inst                  Whether lumen segmentation task is considered.
+  --lumen_dir=<path>            Patch to where lumen segmentation data is located. [default: /root/lsf_workspace/train_data/mtl/patches/lumen]
+  --nuclei_inst                 Whether nuclei instance segmentation task is considered.
+  --nuclei_class                Whether nuclei semantic segmentation (multi-class) task is considered.
+  --nuclei_subtype              Freeze all weights except for nuclei semantic segmentation decoder.
+  --nuclei_dir=<path>           Patch to where gland segmentation data is located. [default: /root/lsf_workspace/train_data/mtl/patches/nuclei]
   --pclass                      Whether patch classification task is considered.
   --pclass_dir=<path>           Patch to where gland segmentation data is located.
-  --pretrained=<str>            String determining what pretrained weights (if any) to use. [default:imagenet]
-  --pretrained_info=<path>      Path to file denoting the paths to pretrained weights. [default:models/pretrained.yml]
+  --pretrained=<str>            String determining what pretrained weights (if any) to use. [default: imagenet]
+  --pretrained_info=<path>      Path to file denoting the paths to pretrained weights. [default: models/pretrained.yml]
   
 """
 
@@ -34,6 +39,7 @@ import os
 import importlib
 import yaml
 import random
+from termcolor import colored
 from collections import OrderedDict
 
 from loader.train_loader import MyConcatDataset
@@ -43,12 +49,15 @@ from loader.train_loader import (
     MixedTaskBatchSampler2,
     PatchSegClassDataset
 )
+from run_train import RunManager
 from misc.utils import mkdir, recur_find_ext
 
 
 if __name__ == "__main__":
     args = docopt(__doc__, version="Main trigger script")
     print(args)
+    print("-*"*40)
+    print("-*"*40)
 
     seed = 5
     os.environ["CUDA_VISIBLE_DEVICES"] = args["--gpu"]
@@ -57,24 +66,37 @@ if __name__ == "__main__":
     root_logdir = args["--log_dir"]
     
     considered_data = []
-    if args["--gland"]:
+    if args["--gland_inst"] or args["--gland_class"]:
         considered_data.append("Gland")
-    if args["--lumen"]:
+    if args["--lumen_inst"]:
         considered_data.append("Lumen")
-    if args["--nuclei"]:
+    if args["--nuclei_inst"] or args["--nuclei_class"]:
         considered_data.append("Nuclei")
     if args["--pclass"]:
         considered_data.append("Patch-Class")
 
-    #! raise an error if task selected, but path to data not given
-    if args["--gland"] and args["--gland_dir"] is None:
-        raise ValueError("Gland task selected, but path to data directory not provided!")
-    if args["--lumen"] and args["--lumen_dir"] is None:
-        raise ValueError("Lumen task selected, but path to data directory not provided!")
-    if args["--nuclei"] and args["--nuclei_dir"] is None:
-        raise ValueError("Nuclei task selected, but path to data directory not provided!")
-    if args["--pclass"] and args["--pclass_dir"] is None:
-        raise ValueError("Patch classification task selected, but path to data directory not provided!")
+    warn = colored('WARNING:', 'red')
+    print(f"{warn} Default data directory may be used - check command line arguments!")
+    
+    gland_dir = args["--gland_dir"]
+    lumen_dir = args["--lumen_dir"]
+    nuclei_dir = args["--nuclei_dir"]
+    pclass_dir = args["--pclass_dir"]
+    
+    #* create list of considered tasks - matches naming convention in paramset.yml of decoder kwargs
+    considered_tasks = []
+    if args["--gland_inst"]:
+        considered_tasks.append("Gland")
+    if args["--gland_class"]:
+        considered_tasks.append("Gland#TYPE")
+    if args["--lumen_inst"]:
+        considered_tasks.append("Lumen")
+    if args["--nuclei_inst"]:
+        considered_tasks.append("Nuclei")
+    if args["--nuclei_class"]:
+        considered_tasks.append("Nuclei#TYPE")
+    if args["--pclass"]:
+        considered_tasks.append("Patch-Class")
 
     def run_one_fold_with_param_set(fold_data, paramset, pretrained_path, save_path):
         mkdir(save_path)
@@ -90,9 +112,12 @@ if __name__ == "__main__":
 
         cfg_module = importlib.import_module("models.opt")
         cfg_getter = getattr(cfg_module, "get_config")
+        settings["model_kwargs"]["considered_tasks"] = considered_tasks
+        settings["model_kwargs"]["subtype_gland"] = args["--gland_subtype"]
+        settings["model_kwargs"]["subtype_nuclei"] = args["--nuclei_subtype"]
         model_config = cfg_getter(
             train_loader_list, infer_loader_list, pretrained_path, **settings)
-
+        
         def create_dataset(run_mode=None, subset_name=None, setup_augmentor=None):
             sub_ds_dict = fold_data[subset_name]
 
@@ -151,8 +176,6 @@ if __name__ == "__main__":
             "model_config": model_config,
         }
 
-        from run_train import RunManager
-
         trainer = RunManager(**run_kwargs)
         trainer.run()
         return
@@ -164,23 +187,23 @@ if __name__ == "__main__":
         3: {"train": 3, "valid": 1},
     }
 
-    # if multiple folds are provided, then run one after the other
+    # if multiple folds are provided, then run one after the other        
     for fold in args["--fold"].split(","):
         fold_info_train = fold_info[int(fold)]["train"]
         fold_info_valid = fold_info[int(fold)]["valid"]
-
+        
         fold_data = {
             "train": OrderedDict([
-                ["Gland",       recur_find_ext(f"{args["--gland_dir"]}/split_{fold_info_train}/996_448", ".dat")],
-                ["Lumen",       recur_find_ext(f"{args["--lumen_dir"]}/split_{fold_info_train}/996_448", ".dat")],
-                ["Nuclei",      recur_find_ext(f"{args["--nuclei_dir"]}/split_{fold_info_train}/996_224", ".dat")],
-                ["Patch-Class", recur_find_ext(f"{args["--pclass_dir"]}/split_{fold_info_train}", ".dat")],
+                ["Gland",       recur_find_ext(f"{gland_dir}/split_{fold_info_train}/996_996", ".dat")],
+                ["Lumen",       recur_find_ext(f"{lumen_dir}/split_{fold_info_train}/996_996", ".dat")],
+                ["Nuclei",      recur_find_ext(f"{nuclei_dir}/split_{fold_info_train}/996_996", ".dat")],
+                ["Patch-Class", recur_find_ext(f"{pclass_dir}/split_{fold_info_train}", ".dat")],
             ]),
             "valid": OrderedDict([
-                ["Gland",       recur_find_ext(f"{args["--gland_dir"]}/split_{fold_info_valid}/996_448", ".dat")],
-                ["Lumen",       recur_find_ext(f"{args["--lumen_dir"]}/split_{fold_info_valid}/996_448", ".dat")],
-                ["Nuclei",      recur_find_ext(f"{args["--nuclei_dir"]}/split_{fold_info_valid}/996_224", ".dat")],
-                ["Patch-Class", recur_find_ext(f"{args["--pclass_dir"]}/split_{fold_info_valid}", ".dat")],
+                ["Gland",       recur_find_ext(f"{gland_dir}/split_{fold_info_valid}/996_996", ".dat")],
+                ["Lumen",       recur_find_ext(f"{lumen_dir}/split_{fold_info_valid}/996_996", ".dat")],
+                ["Nuclei",      recur_find_ext(f"{nuclei_dir}/split_{fold_info_valid}/996_996", ".dat")],
+                ["Patch-Class", recur_find_ext(f"{pclass_dir}/split_{fold_info_valid}", ".dat")],
             ]),
         }
 
@@ -224,14 +247,5 @@ if __name__ == "__main__":
         )
 
         mkdir(save_path)
-        logging.basicConfig(
-            level=logging.INFO,
-            format="|%(asctime)s.%(msecs)03d| [%(levelname)s] %(message)s",
-            datefmt="%Y-%m-%d|%H:%M:%S",
-            handlers=[
-                logging.FileHandler("%s/debug.log" % save_path),
-                logging.StreamHandler(),
-            ],
-        )
         run_one_fold_with_param_set(
             fold_data, paramset, pretrained_path, save_path)

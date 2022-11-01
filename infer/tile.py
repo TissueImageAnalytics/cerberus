@@ -1,4 +1,3 @@
-import logging
 import multiprocessing
 from multiprocessing import Lock, Pool
 
@@ -7,7 +6,6 @@ import math
 import os
 import multiprocessing as mp
 import pathlib
-import warnings
 from concurrent.futures import FIRST_EXCEPTION, ProcessPoolExecutor, as_completed, wait
 from functools import reduce
 from importlib import import_module
@@ -43,9 +41,9 @@ __postproc_func_dict = {
 
 ####
 def _prepare_patching(img, input_size, output_size, output_overlap_size):
-    """Prepare patch information for tile processing.
+    """Prepare the patch information for tile processing.
 
-    Mirror pad the images and generate patch input output placement
+    Apply mirror padding to the images and generate patch input output placement.
     """
 
     win_size = input_size
@@ -109,7 +107,7 @@ def _prepare_patching(img, input_size, output_size, output_overlap_size):
 
 ####
 def _post_process_patches(patch_info_list, image_info, postproc_code=None, postproc_list=None, model_args=None):
-    """Apply post processing to patches.
+    """Apply post-processing to patches.
 
     Args:
         patch_info: patch data and associated information
@@ -135,7 +133,7 @@ def _post_process_patches(patch_info_list, image_info, postproc_code=None, postp
                 nr_out_chs += 1
                 idx_dict[tissue_name] = [start_idx, nr_out_chs]
 
-    # * re-assemble the prediction
+    # * reassemble the prediction
     ch_code_list = list(patch_info_list[0][0].keys())
     
     out_br_list = np.array([v[1][1] for v in patch_info_list])
@@ -298,7 +296,7 @@ class InferManager(base.InferManager):
 
         while len(file_path_list) > 0:
 
-            # * caching N-files and their raw output into memory
+            # * caching N files and their raw output into memory
             file_idx = 0
             cache_image_list = []
             cache_patch_info_list = []
@@ -363,7 +361,8 @@ class InferManager(base.InferManager):
                 cum_patch_output.extend(batch_dat_list)
                 pbar.update()
             pbar.close()
-            # sort patch according to file idx so that later querry is faster
+            
+            # sort patch according to file idx so that later query is faster
             cum_patch_output = sorted(cum_patch_output, key=lambda x: x[-1])
 
             # * parallely assemble the processed cache data for each file if possible

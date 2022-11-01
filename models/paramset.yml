@@ -1,5 +1,3 @@
-
-
 loader_kwargs:
   train: {batch_size : 24, nr_procs: 0}
   valid: {batch_size : 24, nr_procs: 0}
@@ -11,16 +9,24 @@ optimizer_kwargs:
   'weight_decay' : 0.0
 
 loss_kwargs:
-  # 'Lumen-INST'  : {'weight': 1.5, "loss" : {"ce": 1}}
-  # 'Gland-INST'  : {'weight': 1.4, "loss" : {"ce": 1}}
-  # 'Nuclei-INST' : {'weight': 1, "loss" : {"ce": 1}}
-  # 'Patch-Class' : {'weight': 0.4, "loss" : {"ce": 1}}
-  'Lumen-INST'  : {'weight': 0, "loss" : {"ce": 1}}
-  'Gland-INST'  : {'weight': 0, "loss" : {"ce": 1}}
-  'Nuclei-INST' : {'weight': 0, "loss" : {"ce": 1}}
-  'Nuclei-TYPE' : {'weight': 0, "loss" : {"ce": 1, "dice": 1}}
-  'Gland-TYPE' : {'weight': 1, "loss" : {"ce": 1, "dice": 1}}
-  'Patch-Class' : {'weight': 0, "loss" : {"ce": 1}}
+  loss_info:
+    'Lumen-INST'  : {'weight': 1.5, "loss" : {"ce": 1}}
+    'Gland-INST'  : {'weight': 1.4, "loss" : {"ce": 1}}
+    'Nuclei-INST' : {'weight': 1, "loss" : {"ce": 1}}
+    'Nuclei-TYPE' : {'weight': 0, "loss" : {"ce": 1, "dice": 1}}
+    'Gland-TYPE' : {'weight': 1, "loss" : {"ce": 1, "dice": 1}}
+    'Patch-Class' : {'weight': 0.4, "loss" : {"ce": 1}} # less weight for patch classification 
+  class_weight:
+    'Gland-TYPE':
+      1: 1
+      2: 1
+    'Nuclei-TYPE':
+      1: 12
+      2: 1
+      3: 2
+      4: 6
+      5: 12
+      6: 2
 
 dataset_kwargs:
   input_shape: 448
@@ -35,10 +41,8 @@ dataset_kwargs:
     'Patch-Class': 'PC'
 
 model_kwargs:
-  encoder_backbone_name       : resnet34
-  freeze_encoder              : False
-  inst_class_mode             : False
-  decoder_kwargs              :  
+  encoder_backbone_name: resnet34
+  decoder_kwargs:  
     'Lumen':
         'INST': 3           
     'Gland': 
@@ -51,3 +55,5 @@ model_kwargs:
         'TYPE': 3
     'Patch-Class':
         'OUT': 9
+
+
