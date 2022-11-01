@@ -55,7 +55,7 @@ If performing multi-task gland, lumen and nuclei instance segmentation, along wi
 python run.py --gpu="0" --gland_inst --gland_dir=<path> --lumen_inst --lumen_dir=<path> --nuclei_inst --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path>
 ```
 
-Alongside the above, other model details and hyperparameters must be set in `paramset.yml`, including batch size, learning rate, and target output. Also ensure the utilised decoder kwargs, along with the appopriate number of channels are defined - this must align with the tasks specified in the CLIs above!
+Alongside the above, other model details and hyperparameters must be set in `paramset.yml`, including batch size, learning rate, and target output. Also ensure the utilised decoder kwargs, along with the appopriate number of channels are defined - this must align with the tasks specified in the command line arguments above!
 
 ## Inference
 ### Tiles
@@ -78,20 +78,25 @@ For both tile and WSI inference, the model path should point to a directory cont
 
 In this repository, we enable the download of:
 
-- ResNet weights for transfer learning
-- Cerberus model for simultaneous:
+- ResNet weights for transfer learning [[download](link)]:
+- Cerberus model for simultaneous [[download](link)]:
     - Gland instance segmentation 
     - Gland semantic segmentation (classification)
     - Nuclear instance segmentation
-    - Nuclear semantic semgmentation (classification)
+    - Nuclear semantic segmentation (classification)
     - Lumen instance segmentation
     - Tisse type patch classification
 
 
-
 ## Download TCGA Results
 
-Coming soon...
+Coming soon.
+
+## License
+
+Code is under a GPL-3.0 license. See the [LICENSE](https://github.com/TissueImageAnalytics/cerberus/blob/master/LICENSE) file for further details.
+
+Model weights are licensed under [Attribution-NonCommercial-ShareAlike 4.0 International](http://creativecommons.org/licenses/by-nc-sa/4.0/). Please consider the implications of using the weights under this license. 
 
 
 
