@@ -2,7 +2,6 @@ import math
 import numpy as np
 import scipy.io as sio
 import joblib
-from collections import OrderedDict
 
 import torch
 import torch.utils.data as data
@@ -69,7 +68,7 @@ class SerializeFileList(data.IterableDataset):
         self.curr_patch_idx += 1
         return patch_data, output_info, img_idx
 
-####
+
 class SerializeArray(data.Dataset):
     def __init__(self, mmap_array_path, patch_info_list, patch_size, preproc=None):
         super().__init__()
@@ -99,101 +98,7 @@ class SerializeArray(data.Dataset):
         return patch_data, patch_info
 
 
-
 class PatchDataset(torch.utils.data.Dataset):
-    """Loads images from a file list for inference.
-
-    Args:
-        file_list: list of filenames to load
-        input_shape: shape of the input [h,w] - defined in config.py
-        mode: 'train' or 'valid'
-
-    """
-
-    def __init__(
-        self,
-        file_list,
-        input_shape=None
-    ):
-        assert input_shape is not None
-
-        # aggregate the data as [{'image_path': inst_id}]
-        self.info_list = []
-        self.total_objs = 0
-        for filename in file_list:
-            info = sio.loadmat(filename)
-            nr_objs = len(info['class'])
-            for id in range(nr_objs):
-                inst_info = [info['class'][id], info['centroid'][id]]
-                self.info_list.append({filename: inst_info})
-                self.total_objs += 1
-
-        self.input_shape = [input_shape, input_shape]
-        self.id = 0
-
-        return
-
-    def __len__(self):
-        return len(self.info_list)
-
-    def _extract_patch(self, img, centroid, shape):
-        """Extract patch of given size from image centred at a provided
-        coordinate. Also perform reflective padding if needed.
-        
-        """
-        left_ = centroid[0] - (shape[1] // 2)
-        if left_ < 0:
-            padl = abs(left_)
-            left = 0
-        else:
-            padl = 0
-            left = left_
-        right = left_ + shape[1]
-        if right > img.shape[1]:
-            padr = right - img.shape[1]
-            right = img.shape[1]
-        else:
-            padr = 0
-        top_ = centroid[1] - (shape[0] // 2)
-        if top_ < 0:
-            padt = abs(top_)
-            top = 0
-        else:
-            padt = 0
-            top = top_
-        bottom = top_ + shape[0]
-        if bottom > img.shape[0]:
-            padb = bottom - img.shape[0]
-            bottom = img.shape[0]
-        else:
-            padb = 0
-        
-        patch = img[int(top):int(bottom), int(left):int(right)]
-        # perform reflective padding if needed
-        if padl > 0 or padr > 0 or padt > 0 or padb > 0:
-            patch = np.lib.pad(patch, ((int(padt), int(padb)), (int(padl), int(padr)), (0, 0)), 'reflect')
-        return patch 
-
-
-    def __getitem__(self, idx):
-        info_dict = self.info_list[idx]
-        filename = list(info_dict.keys())[0]
-        # read image
-        img = sio.loadmat(filename)["img"]
-        # get centroid and class values
-        inst_info = list(info_dict.values())[0]
-        class_ = inst_info[0] - 1 # class range [0, C-1]
-        centroid = np.round(inst_info[1]) # ensure integer values
-
-        # extract a patch centred at the centroid of a fixed size
-        # extract a patch double the size and then crop after augmentation
-        extract_shape = [self.input_shape[0], self.input_shape[1]]
-        img_patch = self._extract_patch(img, centroid, extract_shape)
-
-        return  img_patch, class_
-
-
-class PatchDataset2(torch.utils.data.Dataset):
     """Loads images from a file list for inference.
 
     Args:

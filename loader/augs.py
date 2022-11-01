@@ -1,16 +1,7 @@
-import math
-
 import cv2
-import matplotlib.cm as cm
 import numpy as np
 
-from scipy import ndimage
 from scipy.ndimage import measurements
-from scipy.ndimage.filters import gaussian_filter
-from scipy.ndimage.interpolation import affine_transform, map_coordinates
-
-from skimage import morphology as morph
-
 
 
 def fix_mirror_padding(ann):

@@ -44,7 +44,7 @@ def unet_weight_map(ann, inst_list, w0=10.0, sigma=3.0, decay_margin=10):
             inst_tl[0] : inst_br[0], inst_tl[1] : inst_br[1], idx
         ] = inst_bgd_dst
 
-    # ! will only work up 2nd closest
+    # ! will only work up to 2nd closest
     near_nth = np.partition(stacked_inst_bgd_dst, 1, axis=-1)[..., 0:2]
     near_1 = near_nth[..., 0]
     near_2 = near_nth[..., 1]
@@ -180,7 +180,6 @@ class PatchClass(object):
 
     def __call__(self, ann, *args, **kwargs):
         return [ann.astype(np.int32)]
-
 
 
 def gen_targets(ann, channel, channel_to_target, crop_shape, task_mode, **kwargs):

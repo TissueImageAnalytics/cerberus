@@ -98,8 +98,6 @@ def get_inst_info_dict(inst_map, type_map, ds_factor=1.0):
     return inst_info_dict
 
 
-
-
 class PostProcABC(object):
     @classmethod
     def to_save_dict(cls, pred_inst):

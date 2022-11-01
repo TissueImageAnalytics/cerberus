@@ -21,8 +21,6 @@ class InferManager(object):
         associated run steps to process each data batch
 
         """
-        # ! this may not be sustainable when mixing multiple different backend
-        # ! such as seg, patch pred, or gcn
         model_desc = import_module("models.net_desc")
         model_creator = getattr(model_desc, "create_model")
 
