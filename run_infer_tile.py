@@ -1,7 +1,7 @@
 """run_infer_tile.py
 
 Usage:
-  run_infer_tile.py [--gpu=<id>] [--model_path=<path>] [--nr_inference_workers=<n>] \
+  run_infer_tile.py [--gpu=<id>] [--model=<path>] [--nr_inference_workers=<n>] \
             [--nr_post_proc_workers=<n>] [--batch_size=<n>] [--tile_shape=<n>] \
             [--input_dir=<path>] [--output_dir=<path>] [--patch_input_shape=<n>] [--patch_output_shape=<n>]
   run_infer_tile.py (-h | --help)
@@ -11,7 +11,7 @@ Options:
   -h --help                   Show this string.
   --version                   Show version.
   --gpu=<id>                  GPU list. [default: 0]
-  --model_path=<path>         Path to saved checkpoint.
+  --model=<path>              Path to saved checkpoint.
   --nr_inference_workers=<n>  Number of workers during inference. [default: 0]
   --nr_post_proc_workers=<n>  Number of workers during post-processing. [default: 0]
   --batch_size=<n>            Batch size. [default: 10]
@@ -44,8 +44,8 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir):
         rm_n_mkdir(output_dir)
 
-    run_root_dir = "/root/lsf_workspace/pretrained/cerberus/resnet34_cerberus_test"
-    checkpoint_path = "%s/resnet34_cerberus_cobi.tar" % run_root_dir
+    run_root_dir = args["--model"]
+    checkpoint_path = "%s/weights.tar" % run_root_dir
     with open("%s/settings.yml" % (run_root_dir)) as fptr:
         run_paramset = yaml.full_load(fptr)
     

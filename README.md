@@ -2,9 +2,7 @@
 
 This repository contains code for using Cerberus, our multi-task model outlined in our [preprint](https://arxiv.org/abs/2203.00077).
 
-Scroll down the README to also find instructions on downloading our pretrained ResNet encoder and WSI-level results.
-
-**WARNING:** THE REPOSITORY IS DUE FOR COMPLETION BY NOVEMBER 19TH 2022.
+Scroll down to the bottom to find instructions on downloading our [pretrained weights](#download-weights) and [WSI-level results](#download-tcga-results).
 
 ## Set Up Environment
 
@@ -35,26 +33,26 @@ The purpose of the main scripts in the repository:
 - `extract_patches.py`: Extract patches from image tiles for multi-task learning
 - `dataset.yml`: Defines the dataset paths and information
 
-# Training 
+## Training 
 
-Before unleashing training, you need to ensure patches are appropriately extracted using `extract_patches.py`. This is only applicable for our segmentation tasks (gland, lumen and nucleus segmentation).
+Before initialising training, ensure patches are appropriately extracted using `extract_patches.py`. This is only applicable for our segmentation tasks (gland, lumen and nucleus segmentation).
 
-Cerberus uses an input patch size of 448x448 for segmentation. For this, we extract a patch double the size (996x996) [set by `win_size` in the script] and then perform a central crop after augmentation. `step_size` determines the stride used during patch extraction. We use 448 for gland/lumen segmentation tasks and 224 for the nucleus segmentation task. All other information, including the image paths, annotation file extension and fold information (`split_info`) should be populated in `dataset.yml`.
+Cerberus uses input patches of size of 448x448 for segmentation. For this, we extract a patches double the size (996x996) [set by `win_size` in the script] and then perform a central crop after augmentation. `step_size` determines the stride used during patch extraction. We use 448 for gland/lumen segmentation tasks and 224 for the nucleus segmentation task. All other information, including the image paths, annotation file extension and fold information (`split_info`) should be populated in `dataset.yml`.
 
 Upon extracting patches, it's time to unleash training. For this, modify the command line arugments in `run.py` enter `python run.py -h` for a full description.
 
 In particular, you can toggle different tasks, set the pretrained weights, determine the batch type and set the paths to the input data. 
 
-For example, if performing single task nuclear segmentation on a single GPU with a mixed batch, use:
+For example, if performing single task nuclear instance segmentation on a single GPU with a mixed batch, use:
 
 ```
-python run.py --gpu="0" --nuclei --nuclei_dir=<path> --mix_target_in_batch --log_dir=<path>
+python run.py --gpu="0" --nuclei_inst --nuclei_dir=<path> --mix_target_in_batch --log_dir=<path>
 ```
 
-If performing multi-task gland, lumen and nuclei segmentation, along with patch classification use:
+If performing multi-task gland, lumen and nuclei instance segmentation, along with patch classification use:
 
 ```
-python run.py --gpu="0" --gland --gland_dir=<path> --lumen --lumen_dir=<path> --nuclei --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path>
+python run.py --gpu="0" --gland_inst --gland_dir=<path> --lumen_inst --lumen_dir=<path> --nuclei_inst --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path>
 ```
 
 Alongside the above, other model details and hyperparameters must be set in `paramset.yml`, including batch size, learning rate, and target output. Also ensure the utilised decoder kwargs, along with the appopriate number of channels are defined - this must align with the tasks specified in the CLIs above!
@@ -64,15 +62,36 @@ Alongside the above, other model details and hyperparameters must be set in `par
 To process large image tiles, run:
 
 ```
-python run_infer_tile.py --gpu="0"
+python run_infer_tile.py --gpu="0" --model=<model_path>
 ```
 
 ### WSIs
 To process whole-slide images, run:
 
 ```
-python run_infer_wsi.py --gpu="0"
+python run_infer_wsi.py --gpu="0" --model=<model_path>
 ```
+
+For both tile and WSI inference, the model path should point to a directory containing the settings file and the weights (`.tar` file). 
+
+## Download Weights
+
+In this repository, we enable the download of:
+
+- ResNet weights for transfer learning
+- Cerberus model for simultaneous:
+    - Gland instance segmentation 
+    - Gland semantic segmentation (classification)
+    - Nuclear instance segmentation
+    - Nuclear semantic semgmentation (classification)
+    - Lumen instance segmentation
+    - Tisse type patch classification
+
+
+
+## Download TCGA Results
+
+Coming soon...
 
 
 

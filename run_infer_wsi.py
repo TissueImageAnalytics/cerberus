@@ -1,7 +1,7 @@
 """run_infer_wsi.py
 
 Usage:
-  run_infer_wsi.py [--gpu=<id>] [--model_path=<path>] [--nr_inference_workers=<n>] \
+  run_infer_wsi.py [--gpu=<id>] [--model=<path>] [--nr_inference_workers=<n>] \
             [--nr_post_proc_workers=<n>] [--batch_size=<n>] [--tile_shape=<n>] [--chunk_shape=<n>] \
             [--ambiguous_size=<int>] [--wsi_proc_mag=<n>] [--wsi_file_ext=<str>] [--cache_path=<path>] \
             [--input_dir=<path>] [--msk_dir=<path>] [--output_dir=<path>] [--patch_input_shape=<n>] \
@@ -13,7 +13,7 @@ Options:
   -h --help                   Show this string.
   --version                   Show version.
   --gpu=<id>                  GPU list. [default: 0]
-  --model_path=<path>         Path to saved checkpoint.
+  --model=<path>              Path to saved checkpoint.
   --nr_inference_workers=<n>  Number of workers during inference. [default: 0]
   --nr_post_proc_workers=<n>  Number of workers during post-processing. [default: 0]
   --batch_size=<n>            Batch size. [default: 100]
@@ -47,8 +47,6 @@ from misc.utils import rm_n_mkdir
 
 if __name__ == "__main__":
     args = docopt(__doc__, version="CoBi Gland Inference")
-
-    method_root_dir = "logs/"
 
     args["--cache_path"] = "/root/dgx_workspace/cache/"
 
@@ -94,8 +92,8 @@ if __name__ == "__main__":
     
     print('Number of WSIs in list:', len(wsi_list))
 
-    run_root_dir = "/root/lsf_workspace/pretrained/cerberus/resnet34_cerberus_test"
-    checkpoint_path = "%s/resnet34_cerberus_cobi.tar" % run_root_dir
+    run_root_dir = args["--model"]
+    checkpoint_path = "%s/weights.tar" % run_root_dir
     with open("%s/settings.yml" % (run_root_dir)) as fptr:
         run_paramset = yaml.full_load(fptr)
 
