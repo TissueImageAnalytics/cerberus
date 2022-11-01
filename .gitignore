@@ -5,6 +5,10 @@
 cache/
 dataset/
 pretrained_weights/
+logging/
+logs/
+test_images/
+output_test/
 
 # files
 *.npz
