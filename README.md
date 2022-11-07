@@ -103,13 +103,11 @@ In this repository, we enable the download of:
     - ImageNet pretrained weights and MTL
     - ImageNet pretrained weights and MTL (with patch classification)
 
-[Download Cerberus model]() \
-[Download ResNet34 weights]() \
-[Download pretrained weights]()
+Download all of the above weights by visiting [this page](https://warwick.ac.uk/fac/cross_fac/tia/software/cerberus/).
 
 Note, the pretrained weights are designed for weight initialisation - not for model inference.
   
-All weights are under a non-commercial license. See the License section for more details.
+All weights are under a non-commercial license. See the [License section](#license) for more details.
 
 ## Download TCGA Results
 
