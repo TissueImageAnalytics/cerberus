@@ -13,7 +13,6 @@ output_test/
 
 # files
 *.npz
-*.png
 *.log
 *.dat
 *.csv
