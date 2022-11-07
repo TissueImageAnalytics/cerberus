@@ -31,3 +31,4 @@ dependencies:
     - openslide-python==1.1.2
     - seaborn==0.11.2
     - tensorboardx==2.5.1
+    - tiatoolbox==1.3.0

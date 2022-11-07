@@ -24,8 +24,6 @@ import yaml
 from scipy.ndimage import measurements
 from datetime import datetime
 
-sys.path.append("/root/romesco_workspace/code/tiatoolbox")
-
 from loader.postproc import (
     PostProcInstErodedContourMap,
     PostProcInstErodedMap,
@@ -43,13 +41,12 @@ from tiatoolbox.models import (
     WSIStreamDataset,
 )
 from tiatoolbox.models.architecture.hovernet import HoVerNet
-from tiatoolbox.wsicore.wsireader import get_wsireader, VirtualWSIReader
+from tiatoolbox.wsicore.wsireader import WSIReader, VirtualWSIReader
 
 from . import base
 
 # ! Change this to match with the targets.py gen code
 # target key gen code : post proc class
-#! HACK - FIND BETTER WAY TO DO THIS- MAYBE IN A SEPARATE PYTHON SCRIPT
 _postproc_func_dict = {
     "IP-ERODED-3": PostProcInstErodedMap,
     "IP-ERODED-11": PostProcInstErodedMap,
@@ -519,7 +516,8 @@ class InferManager(base.InferManager):
         # assume ioconfig has already been
         # converted to `baseline` for `tile` mode
         resolution = ioconfig.highest_input_resolution
-        self.wsi_handler = get_wsireader(input_img=wsi_path)
+        # self.wsi_handler = get_wsireader(input_img=wsi_path)
+        self.wsi_handler = WSIReader.open(input_img=wsi_path)
 
         # in XY
         self.wsi_proc_shape = self.wsi_handler.slide_dimensions(**resolution)
