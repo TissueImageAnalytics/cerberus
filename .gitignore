@@ -7,7 +7,8 @@ dataset/
 pretrained_weights/
 logging/
 logs/
-test_images/
+images_test/
+wsi_test/
 output_test/
 
 # files
