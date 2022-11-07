@@ -943,7 +943,7 @@ class InferManager(base.InferManager):
             #* LOGGING
             dt_now = datetime.now()
             dt_string = dt_now.strftime("%d-%m-%Y_%H:%M:%S")
-            wsi_logging_path = f"logging/{wsi_basename}_{dt_string}_std.log"
+            wsi_logging_path = f"{self.logging_dir}/{wsi_basename}_{dt_string}_std.log"
 
             self.logger = logging.getLogger()
             fhandler = logging.FileHandler(filename=wsi_logging_path, mode='w')

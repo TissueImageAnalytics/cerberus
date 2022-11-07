@@ -1,9 +1,7 @@
 import warnings
-
 warnings.filterwarnings("ignore")
-from importlib import import_module
-from multiprocessing import Lock, Pool
 
+from importlib import import_module
 import torch
 from termcolor import colored
 
@@ -51,6 +49,6 @@ class InferManager(object):
         module_lib = import_module("models.run_desc")
         run_step = getattr(module_lib, "infer_step")
         self.run_step = lambda input_batch, output_shape: run_step(
-            input_batch, net, output_shape
+            input_batch, net, output_shape, self.model_args["considered_tasks"]
         )
         return

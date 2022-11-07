@@ -432,7 +432,7 @@ def valid_step(batch_data, run_info):
     return result_dict
 
 
-def infer_step(img_list, model, output_shape):
+def infer_step(img_list, model, output_shape, head_name_list):
     img_list = img_list.to("cuda").type(torch.float32)  # to NCHW
     img_list = img_list.permute(0, 3, 1, 2).contiguous()
 
@@ -463,18 +463,18 @@ def infer_step(img_list, model, output_shape):
         [[k, v.permute(0, 2, 3, 1).contiguous()] for k, v in pred_dict.items()]
     )
 
-    #! Should make sure this is in the same order as settings.yml
-    head_name_list = [
-        "Gland-INST",
-        "Gland-TYPE",
-        "Lumen-INST",
-        "Nuclei-INST",
-        "Nuclei-TYPE",
-        "Patch-Class",
-    ]
+    head_name_map = {
+        "Gland" : "Gland-INST",
+        "Gland#TYPE" : "Gland-TYPE",
+        "Lumen" : "Lumen-INST",
+        "Nuclei" : "Nuclei-INST",
+        "Nuclei#TYPE" : "Nuclei-TYPE",
+        "Patch-Class" : "Patch-Class",
+    }
 
     sub_pred_dict = OrderedDict()
-    for head_name in head_name_list:
+    for head_name_ in head_name_list:
+        head_name = head_name_map[head_name_]
         head_output = pred_dict[head_name]
         head_output = proc_func_dict[head_name](head_output)
         if head_name == "Patch-Class":

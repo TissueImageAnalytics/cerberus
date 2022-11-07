@@ -4,7 +4,7 @@ Usage:
   run_infer_wsi.py [--gpu=<id>] [--model=<path>] [--nr_inference_workers=<n>] \
             [--nr_post_proc_workers=<n>] [--batch_size=<n>] [--tile_shape=<n>] [--chunk_shape=<n>] \
             [--ambiguous_size=<int>] [--wsi_proc_mag=<n>] [--wsi_file_ext=<str>] [--cache_path=<path>] \
-            [--input_dir=<path>] [--msk_dir=<path>] [--output_dir=<path>] [--patch_input_shape=<n>] \
+            [--logging_dir=<path>] [--input_dir=<path>] [--msk_dir=<path>] [--output_dir=<path>] [--patch_input_shape=<n>] \
             [--patch_output_shape=<n>] [--wsi_bulk_idx=<n>] [--wsi_proc_step=<n>] [--save_thumb] [--save_mask]
   run_infer_wsi.py (-h | --help)
   run_infer_wsi.py --version
@@ -16,13 +16,14 @@ Options:
   --model=<path>              Path to saved checkpoint.
   --nr_inference_workers=<n>  Number of workers during inference. [default: 0]
   --nr_post_proc_workers=<n>  Number of workers during post-processing. [default: 0]
-  --batch_size=<n>            Batch size. [default: 100]
+  --batch_size=<n>            Batch size. [default: 30]
   --tile_shape=<n>            Shape of tile for processing. [default: 2048]
   --chunk_shape=<n>           Shape of tile for processing. [default: 15000]
   --ambiguous_size=<int>      Define ambiguous region along tiling grid to perform re-post processing. [default: 64]
   --wsi_proc_mag=<n>          Microns per pixel used for WSI processing. [default: 0.5]
   --wsi_file_ext=<str>        File extension of WSIs to process. [default: .svs]
   --cache_path=<path>         Path for cache. Should be placed on SSD with at least 100GB. [default: cache/]
+  --logging_dir=<path>        Path for python logging. [default: logging/]
   --input_dir=<path>          Path to input data directory. Assumes the files are not nested within directory.
   --msk_dir=<path>            Path to directory containing tissue masks. Should have the same name as corresponding WSIs.
   --output_dir=<path>         Path to output data directory. Will create automtically if doesn't exist. [default: output/]
@@ -55,12 +56,17 @@ if __name__ == "__main__":
 
     input_dir =  args["--input_dir"]
     output_dir =  args["--output_dir"]
+    logging_dir =  args["--logging_dir"]
     cache_path = args["--cache_path"] + args["--wsi_bulk_idx"]
     wsi_file_ext = args["--wsi_file_ext"]
 
     # create output directory
     if not os.path.exists(output_dir):
         rm_n_mkdir(output_dir)
+    
+    # create logging directory
+    if not os.path.exists(logging_dir):
+        rm_n_mkdir(logging_dir)
 
     wsi_file_list = glob.glob(f"{input_dir}/*{wsi_file_ext}")
     wsi_file_list.sort()
@@ -120,6 +126,7 @@ if __name__ == "__main__":
         "chunk_shape": int(args["--chunk_shape"]),
         "ambiguous_size": int(args["--ambiguous_size"]),
         "cache_path": cache_path,
+        "logging_dir": logging_dir,
         "wsi_proc_mag": float(args["--wsi_proc_mag"]),
     }
     run_args.update(wsi_run_args)
