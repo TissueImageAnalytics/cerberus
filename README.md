@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="doc/cerberus.png">
+  <img src="doc/cerberus.png",
+  width="400",
+  height="110" >
 </p>
 
 # One Model is All You Need: Multi-Task Learning Enables Simultaneous Histology Image Segmentation and Classification 
