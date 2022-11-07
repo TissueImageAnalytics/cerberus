@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="doc/cerberus.png">
+</p>
+
 # One Model is All You Need: Multi-Task Learning Enables Simultaneous Histology Image Segmentation and Classification 
 
 This repository contains code for using Cerberus, our multi-task model outlined in our [preprint](https://arxiv.org/abs/2203.00077).
