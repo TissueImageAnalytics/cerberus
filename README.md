@@ -13,12 +13,15 @@ Scroll down to the bottom to find instructions on downloading our [pretrained we
 ## Set Up Environment
 
 ```
+# create base conda environment
 conda env create -f environment.yml
-conda activate cerberus
-pip install torch==1.6.0 torchvision==0.7.0
-```
 
-Above, we install PyTorch version 1.6 with CUDA 10.2. 
+# activate environment
+conda activate cerberus
+
+# install PyTorch with pip
+pip install torch==1.10.1+cu102 torchvision==0.11.2+cu102 -f https://download.pytorch.org/whl/cu102/torch_stable.html
+```
 
 ## Repository Structure
 
@@ -68,15 +71,19 @@ Alongside the above, other model details and hyperparameters must be set in `par
 To process large image tiles, run:
 
 ```
-python run_infer_tile.py --gpu="0" --model=<model_path>
+python run_infer_tile.py --gpu=<gpu_id> --batch_size=<n> --model=<path> --input_dir=<path> --output_dir=<path> 
 ```
+
+For convenience, we have also included a bash script, where you can populate command line arguments. To make this script executable, run `chmod +x run_tile.sh`. Then use the command `./run_tile.sh`.
 
 ### WSIs
 To process whole-slide images, run:
 
 ```
-python run_infer_wsi.py --gpu="0" --model=<model_path>
+python run_infer_wsi.py --gpu=<gpu_id> --batch_size=<n> --model=<path> --input_dir=<path>  --output_dir=<path> 
 ```
+
+Similar to the tile mode, we have included an example bash script (`run_wsi.sh`) that can be used to run the command, without having to always re-enter the arguments.
 
 For both tile and WSI inference, the model path should point to a directory containing the settings file and the weights (`.tar` file). 
 
@@ -84,15 +91,25 @@ For both tile and WSI inference, the model path should point to a directory cont
 
 In this repository, we enable the download of:
 
-- ResNet weights for transfer learning [[download](link)]:
-- Cerberus model for simultaneous [[download](link)]:
+- Cerberus model for simultaneous:
     - Gland instance segmentation 
     - Gland semantic segmentation (classification)
     - Nuclear instance segmentation
     - Nuclear semantic segmentation (classification)
     - Lumen instance segmentation
-    - Tisse type patch classification
+    - Tissue type patch classification
+- ResNet weights for transfer learning:
+- Weights obtained from training each fold using:
+    - ImageNet pretrained weights and MTL
+    - ImageNet pretrained weights and MTL (with patch classification)
 
+[Download Cerberus model]() \
+[Download ResNet34 weights]() \
+[Download pretrained weights]()
+
+Note, the pretrained weights are designed for weight initialisation - not for model inference.
+  
+All weights are under a non-commercial license. See the License section for more details.
 
 ## Download TCGA Results
 
