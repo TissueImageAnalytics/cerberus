@@ -164,20 +164,20 @@ def _process_tile_predictions(
     # create margin bounding box, ordering should match with
     # created tile info flag (top, bottom, left, right)
     boundary_lines = [
-        shapely_box(0, 0, w, 1),  # noqa top egde
+        shapely_box(0, 0, w, 1),  # noqa top edge
         shapely_box(0, h - 1, w, h),  # noqa bottom edge
         shapely_box(0, 0, 1, h),  # noqa left
         shapely_box(w - 1, 0, w, h),  # noqa right
     ]
     margin_boxes = [
-        shapely_box(0, 0, w, m),  # noqa top egde
+        shapely_box(0, 0, w, m),  # noqa top edge
         shapely_box(0, h - m, w, h),  # noqa bottom edge
         shapely_box(0, 0, m, h),  # noqa left
         shapely_box(w - m, 0, w, h),  # noqa right
     ]
     # ! this is wrt to WSI coordinate space, not tile
     margin_lines = [
-        [[m, m], [w - m, m]],  # noqa top egde
+        [[m, m], [w - m, m]],  # noqa top edge
         [[m, h - m], [w - m, h - m]],  # noqa bottom edge
         [[m, m], [m, h - m]],  # noqa left
         [[w - m, m], [w - m, h - m]],  # noqa right
@@ -516,13 +516,16 @@ class InferManager(base.InferManager):
         # assume ioconfig has already been
         # converted to `baseline` for `tile` mode
         resolution = ioconfig.highest_input_resolution
-        # self.wsi_handler = get_wsireader(input_img=wsi_path)
         self.wsi_handler = WSIReader.open(input_img=wsi_path)
 
         # in XY
         self.wsi_proc_shape = self.wsi_handler.slide_dimensions(**resolution)
         # to YX
         self.wsi_proc_shape = self.wsi_proc_shape[::-1]
+        
+        self.wsi_base_mag = self.wsi_handler.info.mpp # get scan resolution of WSI
+        self.wsi_base_shape = self.wsi_handler.slide_dimensions({"resolution": self.base_mag, "units": "mpp"})
+        self.wsi_base_shape = self.wsi_base_shape[::-1] # to YX
 
         if mask_path is not None and os.path.isfile(mask_path):
             wsi_mask = cv2.imread(mask_path)
@@ -834,7 +837,13 @@ class InferManager(base.InferManager):
         
         output_path = "%s/dat/%s" % (output_dir, wsi_basename)
 
-        wsi_inst_info["resolution"] = {"resolution": 0.5, "units": "mpp"}
+        # add resolution information
+        wsi_inst_info["proc_resolution"] = {"proc_resolution": self.wsi_proc_mag, "units": "mpp"}
+        wsi_inst_info["base_resolution"] = {"base_resolution": self.wsi_base_mag, "units": "mpp"}
+        wsi_inst_info["proc_dimensions"] = {"proc_dimensions": self.wsi_proc_shape} # YX
+        wsi_inst_info["base_dimensions"] = {"base_dimensions": self.wsi_base_shape} # YX
+        
+        # save dictionary as dat file
         joblib.dump(wsi_inst_info, f"{output_path}.dat")
 
         end = time.perf_counter()
