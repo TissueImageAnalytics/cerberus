@@ -838,10 +838,10 @@ class InferManager(base.InferManager):
         output_path = "%s/dat/%s" % (output_dir, wsi_basename)
 
         # add resolution information
-        wsi_inst_info["proc_resolution"] = {"proc_resolution": self.wsi_proc_mag, "units": "mpp"}
-        wsi_inst_info["base_resolution"] = {"base_resolution": self.wsi_base_mag, "units": "mpp"}
-        wsi_inst_info["proc_dimensions"] = {"proc_dimensions": self.wsi_proc_shape} # YX
-        wsi_inst_info["base_dimensions"] = {"base_dimensions": self.wsi_base_shape} # YX
+        wsi_inst_info["proc_resolution"] = {"resolution": self.wsi_proc_mag, "units": "mpp"}
+        wsi_inst_info["base_resolution"] = {"resolution": self.wsi_base_mag, "units": "mpp"}
+        wsi_inst_info["proc_dimensions"] = self.wsi_proc_shape # YX
+        wsi_inst_info["base_dimensions"] = self.wsi_base_shape # YX
         
         # save dictionary as dat file
         joblib.dump(wsi_inst_info, f"{output_path}.dat")
