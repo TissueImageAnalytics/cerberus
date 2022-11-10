@@ -4,6 +4,10 @@
   height="146" >
 </p>
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)
+  <a href="#cite-this-repository"><img src="https://img.shields.io/badge/Cite%20this%20repository-BibTeX-brightgreen" alt="DOI"></a> 
+<br>
+
 # One Model is All You Need: Multi-Task Learning Enables Simultaneous Histology Image Segmentation and Classification 
 
 This repository contains code for using Cerberus, our multi-task model outlined in our [preprint](https://arxiv.org/abs/2203.00077).
@@ -119,8 +123,16 @@ Code is under a GPL-3.0 license. See the [LICENSE](https://github.com/TissueImag
 
 Model weights are licensed under [Attribution-NonCommercial-ShareAlike 4.0 International](http://creativecommons.org/licenses/by-nc-sa/4.0/). Please consider the implications of using the weights under this license. 
 
+## Cite this repository
 
-
+```
+@article{graham2022one,
+  title={One Model is All You Need: Multi-Task Learning Enables Simultaneous Histology Image Segmentation and Classification},
+  author={Graham, Simon and Vu, Quoc Dang and Jahanifar, Mostafa and Minhas, Fayyaz and Snead, David and Rajpoot, Nasir},
+  journal={arXiv preprint arXiv:2203.00077},
+  year={2022}
+}
+```
 
 
 
