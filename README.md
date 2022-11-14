@@ -5,12 +5,13 @@
 </p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)
-  <a href="#cite-this-repository"><img src="https://img.shields.io/badge/Cite%20this%20repository-BibTeX-brightgreen" alt="DOI"></a> 
+  <a href="#cite-this-repository"><img src="https://img.shields.io/badge/Cite%20this%20repository-BibTeX-brightgreen" alt="DOI"></a> <a href="https://doi.org/10.1016/j.media.2022.102685"><img src="https://img.shields.io/badge/DOI-10.1016%2Fj.media.2022.102685-blue" alt="DOI"></a>
 <br>
+
 
 # One Model is All You Need: Multi-Task Learning Enables Simultaneous Histology Image Segmentation and Classification 
 
-This repository contains code for using Cerberus, our multi-task model outlined in our [preprint](https://arxiv.org/abs/2203.00077).
+This repository contains code for using Cerberus, our multi-task model outlined in our [Medical Image Analysis paper](https://doi.org/10.1016/j.media.2022.102685).
 
 Scroll down to the bottom to find instructions on downloading our [pretrained weights](#download-weights) and [WSI-level results](#download-tcga-results).
 
@@ -127,10 +128,12 @@ Model weights are licensed under [Attribution-NonCommercial-ShareAlike 4.0 Inter
 
 ```
 @article{graham2022one,
-  title={One Model is All You Need: Multi-Task Learning Enables Simultaneous Histology Image Segmentation and Classification},
-  author={Graham, Simon and Vu, Quoc Dang and Jahanifar, Mostafa and Minhas, Fayyaz and Snead, David and Rajpoot, Nasir},
-  journal={arXiv preprint arXiv:2203.00077},
-  year={2022}
+  title={One model is all you need: multi-task learning enables simultaneous histology image segmentation and classification},
+  author={Graham, Simon and Vu, Quoc Dang and Jahanifar, Mostafa and Raza, Shan E Ahmed and Minhas, Fayyaz and Snead, David and Rajpoot, Nasir},
+  journal={Medical Image Analysis},
+  pages={102685},
+  year={2022},
+  publisher={Elsevier}
 }
 ```
 
