@@ -20,10 +20,8 @@ from .run_desc import (
     viz_step_output,
 )
 
-# __PER_N_STEPS = 3000 # mtl
+__PER_N_STEPS = 2000 # mtl
 # __PER_N_STEPS = 800 # nuc-class
-
-__PER_N_STEPS = 3 
 
 def get_config(
     train_loader_list,
@@ -55,12 +53,9 @@ def get_config(
                         ],
                         # learning rate scheduler
                         "lr_scheduler": lambda opt, n_iter: optim.lr_scheduler.StepLR(
-                            # opt, 75000 #mtl
-                            opt, 16000 #nuc-class
-                            # opt, 9000
+                            opt, 75000 # mtl
+                            # opt, 16000 # nuc-class
                         ),
-                        # 'lr_scheduler': lambda opt, n_iter: \
-                        #     optim.lr_scheduler.CosineAnnealingLR(opt, 50),
                         "extra_info": {
                             "loss": loss_kwargs
                             # OUTPUT_HEAD_NAME(TARGET_NAME)
@@ -74,8 +69,8 @@ def get_config(
                     },
                 },
                 "loader": loader_kwargs,
-                "nr_epochs": 140,
-                # "nr_epochs": 800,
+                "nr_epochs": 140, # mtl
+                # "nr_epochs": 800, # nuc-class
             },
         ],
         # ------------------------------------------------------------------

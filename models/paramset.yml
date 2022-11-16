@@ -1,7 +1,9 @@
+# loss weighting and batch size may be different to original publication
+
 loader_kwargs:
-  train: {batch_size : 24, nr_procs: 0}
-  valid: {batch_size : 24, nr_procs: 0}
-  test : {batch_size : 24, nr_procs: 0}
+  train: {batch_size : 12, nr_procs: 0}
+  valid: {batch_size : 12, nr_procs: 0}
+  test : {batch_size : 12, nr_procs: 0}
 
 optimizer_kwargs:
   'lr' : 1.0e-3
