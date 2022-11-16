@@ -160,12 +160,12 @@ class NetDesc(nn.Module):
             decoder_train_flag = decoder_name in train_decoder_list
 
             # no gradient if using subtype mode - only train relevant decoders!
-            if "TYPE" not in decoder_name:
-                decoder_train_flag = False
-            else:
-                if ("Gland" in decoder_name and not self.subtype_gland) or ("Nuclei" in decoder_name and not self.subtype_nuclei):
+            if self.subtype_gland or self.subtype_nuclei:                
+                if "TYPE" not in decoder_name:
                     decoder_train_flag = False
-
+                else:
+                    if ("Gland" in decoder_name and not self.subtype_gland) or ("Nuclei" in decoder_name and not self.subtype_nuclei):
+                        decoder_train_flag = False
             if decoder_name == "Patch-Class":
                 with torch.set_grad_enabled(decoder_train_flag):
                     feat_shape = bottom_feats[-2:].detach().cpu().numpy().shape[-2:]

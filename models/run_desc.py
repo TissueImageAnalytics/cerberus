@@ -173,13 +173,9 @@ def train_step(batch_data, run_info):
     proc_func_dict = {
         "Lumen-INST": lambda x: torch.softmax(x, -1)[..., 1:],
         "Gland-INST": lambda x: torch.softmax(x, -1)[..., 1:],
-        "Gland-TYPE": lambda x: torch.argmax(
-            torch.softmax(x, -1), dim=-1, keepdim=False
-        ),
+        "Gland-TYPE": lambda x: torch.softmax(x, -1),
         "Nuclei-INST": lambda x: torch.softmax(x, -1)[..., 1:],
-        "Nuclei-TYPE": lambda x: torch.argmax(
-            torch.softmax(x, -1), dim=-1, keepdim=False
-        ),
+        "Nuclei-TYPE": lambda x: torch.softmax(x, -1),
         "Patch-Class": lambda x: torch.argmax(
             torch.softmax(x, -1), dim=-1, keepdim=True
         ),
@@ -203,18 +199,25 @@ def train_step(batch_data, run_info):
     for head_name, head_output in pred_dict.items():
         head_output = head_output[sample_indices]
         head_output_pred = proc_func_dict[head_name](head_output)
-        if head_name == "Patch-Class":
+        if head_name == "Patch-Class" or "Patch-Class" in tgt_name_list:
+            if head_name != "Patch-Class":
+                head_output_pred = torch.permute(head_output_pred, (0, 3, 1, 2))
             head_output_pred = F.interpolate(
                 head_output_pred.type(torch.float32), size=input_dims, mode="nearest"
             )
+            head_output_pred = torch.permute(head_output_pred, (0, 2, 3, 1))
         head_output_pred = torch.squeeze(head_output_pred)
+        if "TYPE" in head_name:
+            head_output_pred = torch.argmax(head_output_pred, dim=-1, keepdim=False)
         sub_pred_dict[head_name] = head_output_pred.detach().cpu().numpy()
 
         head_output_true = true_dict[head_name][sample_indices]
-        if head_name == "Patch-Class":
+        if head_name == "Patch-Class" or "Patch-Class" in tgt_name_list:
+            head_output_true = torch.permute(head_output_true, (0, 3, 1, 2))
             head_output_true = F.interpolate(
                 head_output_true.type(torch.float32), size=input_dims, mode="nearest"
             )
+            head_output_true = torch.permute(head_output_true, (0, 2, 3, 1))
         head_output_true = torch.squeeze(head_output_true)
         sub_true_dict[head_name] = head_output_true.detach().cpu().numpy()
 
@@ -273,36 +276,33 @@ def viz_step_output(raw_data, value_range=None, align_mode="max"):
     def make_row(arr_dict, sample_idx, viz_info, map_type="pred", nr_inst_classes=3):
         col_list = []
         for k, v in arr_dict.items():
-            v = v[sample_idx]
-            if align_mode == "max":
-                v = center_pad_to_shape(v, aligned_shape)
-            else:
-                v = cropping_center(v, aligned_shape)
-            if k == "img":
-                v = make_border(v)
-                col_list = [v] + col_list  # prepend
-                continue
+            # don't perform viz for patch classification
+            if k != "Patch-Class":
+                v = v[sample_idx]
+                if align_mode == "max":
+                    v = center_pad_to_shape(v, aligned_shape)
+                else:
+                    v = cropping_center(v, aligned_shape)
+                if k == "img":
+                    v = make_border(v)
+                    col_list = [v] + col_list  # prepend
+                    continue
 
-            v_range = viz_info[k]["range"]
-            cmap = viz_info[k]["cmap"]
+                v_range = viz_info[k]["range"]
+                cmap = viz_info[k]["cmap"]
 
-            if k == "Patch-Class":
-                v = colorize(v, v_range[0], v_range[1], cmap)
-                v = make_border(v)
-                col_list.append(v)
-
-            elif v.ndim == 2:
-                for val in range(nr_inst_classes - 1):
-                    v_tmp = v == val + 1
-                    v_tmp = colorize(v_tmp, v_range[0], v_range[1], cmap)
-                    v_tmp = make_border(v_tmp)
-                    col_list.append(v_tmp)
-            else:
-                for idx in range(v.shape[-1]):
-                    v_tmp = v[..., idx]
-                    v_tmp = colorize(v_tmp, v_range[0], v_range[1], cmap)
-                    v_tmp = make_border(v_tmp)
-                    col_list.append(v_tmp)
+                if v.ndim == 2:
+                    for val in range(nr_inst_classes - 1):
+                        v_tmp = v == val + 1
+                        v_tmp = colorize(v_tmp, v_range[0], v_range[1], cmap)
+                        v_tmp = make_border(v_tmp)
+                        col_list.append(v_tmp)
+                else:
+                    for idx in range(v.shape[-1]):
+                        v_tmp = v[..., idx]
+                        v_tmp = colorize(v_tmp, v_range[0], v_range[1], cmap)
+                        v_tmp = make_border(v_tmp)
+                        col_list.append(v_tmp)
         col_list = np.concatenate(col_list, axis=1)
         return col_list
 
@@ -317,7 +317,6 @@ def viz_step_output(raw_data, value_range=None, align_mode="max"):
         "Gland-TYPE": {"range": (0, 2), "cmap": plt.get_cmap("nipy_spectral")},
         "Nuclei-INST": {"range": (0, 1), "cmap": plt.get_cmap("jet")},
         "Nuclei-TYPE": {"range": (0, 6), "cmap": plt.get_cmap("nipy_spectral")},
-        "Patch-Class": {"range": (0, 7), "cmap": plt.get_cmap("nipy_spectral")},
     }
 
     row_list = []
@@ -352,7 +351,6 @@ def valid_step(batch_data, run_info):
     has_target_list = batch_data.pop("dummy_target")
     true_dict = batch_data
 
-    batch_size = img_list.shape[0]
     img_list = img_list.to("cuda").type(torch.float32)  # to NCHW
     img_list = img_list.permute(0, 3, 1, 2).contiguous()
 
@@ -363,21 +361,21 @@ def valid_step(batch_data, run_info):
         [[k, v.permute(0, 3, 1, 2).contiguous()] for k, v in true_dict.items()]
     )
 
+    tgt_name_list = np.unique(has_target_list[has_target_list != None])
+    tgt_name_list = list(tgt_name_list) # convert back to list for index retrieval later
+    
     #### *
     model.eval()
+    
     with torch.no_grad():
         pred_dict = model(img_list)
 
     proc_func_dict = {
         "Lumen-INST": lambda x: torch.softmax(x, -1)[..., 1:],
         "Gland-INST": lambda x: torch.softmax(x, -1)[..., 1:],
-        "Gland-TYPE": lambda x: torch.argmax(
-            torch.softmax(x, -1), dim=-1, keepdim=False
-        ),
+        "Gland-TYPE": lambda x: torch.softmax(x, -1),
         "Nuclei-INST": lambda x: torch.softmax(x, -1)[..., 1:],
-        "Nuclei-TYPE": lambda x: torch.argmax(
-            torch.softmax(x, -1), dim=-1, keepdim=False
-        ),
+        "Nuclei-TYPE": lambda x: torch.softmax(x, -1),
         "Patch-Class": lambda x: torch.argmax(
             torch.softmax(x, -1), dim=-1, keepdim=True
         ),
@@ -399,20 +397,26 @@ def valid_step(batch_data, run_info):
     for head_name, head_output in pred_dict.items():
 
         head_output_pred = proc_func_dict[head_name](head_output)
-        if head_name == "Patch-Class":
+        if head_name == "Patch-Class" or "Patch-Class" in tgt_name_list:
+            if head_name != "Patch-Class":
+                head_output_pred = torch.permute(head_output_pred, (0, 3, 1, 2))
             head_output_pred = F.interpolate(
                 head_output_pred.type(torch.float32), size=input_dims, mode="nearest"
             )
+            head_output_pred = torch.permute(head_output_pred, (0, 2, 3, 1))
         head_output_pred = torch.squeeze(head_output_pred)
+        if "TYPE" in head_name:
+            head_output_pred = torch.argmax(head_output_pred, dim=-1, keepdim=False)
         sub_pred_dict[head_name] = head_output_pred.detach().cpu().numpy()
 
         head_output_true = true_dict[head_name]
 
-        if head_name == "Patch-Class":
+        if head_name == "Patch-Class" or "Patch-Class" in tgt_name_list:
+            if head_name == "Patch-Class":
+                head_output_true = torch.permute(head_output_true, (0, 3, 1, 2))
             head_output_true = F.interpolate(
                 head_output_true.type(torch.float32), size=input_dims, mode="nearest"
             )
-        
         head_output_true = torch.squeeze(head_output_true)
         sub_true_dict[head_name] = head_output_true.detach().cpu().numpy()
 
@@ -443,17 +447,13 @@ def infer_step(img_list, model, output_shape, head_name_list):
     model.eval()
     with torch.no_grad():
         pred_dict = model(img_list)
-
+    
     proc_func_dict = {
         "Lumen-INST": lambda x: torch.softmax(x, -1)[..., 1:],
         "Gland-INST": lambda x: torch.softmax(x, -1)[..., 1:],
-        "Gland-TYPE": lambda x: torch.argmax(
-            torch.softmax(x, -1), dim=-1, keepdim=False
-        ),
+        "Gland-TYPE": lambda x: torch.softmax(x, -1),
         "Nuclei-INST": lambda x: torch.softmax(x, -1)[..., 1:],
-        "Nuclei-TYPE": lambda x: torch.argmax(
-            torch.softmax(x, -1), dim=-1, keepdim=False
-        ),
+        "Nuclei-TYPE": lambda x: torch.softmax(x, -1),
         "Patch-Class": lambda x: torch.argmax(
             torch.softmax(x, -1), dim=-1, keepdim=True
         ),
@@ -487,6 +487,8 @@ def infer_step(img_list, model, output_shape, head_name_list):
                 head_output = torch.unsqueeze(head_output, 0)
         else:
             head_output = cropping_center(head_output, output_shape, batch=True)
+        if "TYPE" in head_name:
+            head_output = torch.argmax(head_output, dim=-1, keepdim=False)
         sub_pred_dict[head_name] = head_output.detach().cpu().numpy()
 
     batch_output_list = []
@@ -534,13 +536,9 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
     for target_name, cum_stat in cum_stat_dict.items():
         if "INST" in target_name:
             for k, v in cum_stat.items():
-                accu, dice = summarize_stats(v)
-                track_value(f"{target_name}-{k}-accu", accu, "scalar")
-                track_value(f"{target_name}-{k}-dice", dice, "scalar")
-                #* print stats to terminal
-                print()
-                print(f"{target_name}-{k}-accu", accu)
-                print(f"{target_name}-{k}-dice", dice)
+                accu_list, dice_list = summarize_stats(v)
+                track_value(f"{target_name}-{k}-accu", accu_list, "scalar")
+                track_value(f"{target_name}-{k}-dice", dice_list, "scalar")
         elif "TYPE" in target_name:
             accu_list = []
             dice_list = []
@@ -559,8 +557,12 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
                 accu_list.append(accu)
                 dice_list.append(dice)
                 track_value(f"{target_name}-{k}-dice", dice, "scalar")
-            track_value(f"{target_name}-all-accu", np.mean(accu_list), "scalar")
+            track_value(f"{target_name}-avg-accu", np.mean(accu_list), "scalar")
             track_value(f"{target_name}-avg-dice", np.mean(dice_list), "scalar")
+            
+        print()
+        print(f"{target_name}-avg-accu", np.mean(accu_list))
+        print(f"{target_name}-avg-dice", np.mean(dice_list))
 
     ####
     sampled_raw_data = epoch_data[0]
@@ -577,7 +579,7 @@ def proc_cum_epoch_step_output(runner_name, epoch_data):
         pred_list = flatten_dict_hierarchy(["pred", target_name], sampled_raw_data)
         true_list = flatten_dict_hierarchy(["true", target_name], sampled_raw_data)
         pred_dict[target_name] = pred_list
-        true_dict[target_name] = pred_list
+        true_dict[target_name] = true_list
 
     # * pick 1 random sample from the batch for visualization
     nr_sel_sample = 1
@@ -632,7 +634,7 @@ class ProcStepRawOutput(BaseCallbacks):
 
             return cum_dict
 
-        def get_batch_stat(patch_pred, patch_true, cum_dict, target_name, channel_info):
+        def get_batch_stat(patch_true, patch_pred, cum_dict, target_name, channel_info):
             patch_true = np.squeeze(patch_true)  # ! may be wrong for n=1
             patch_pred = np.squeeze(patch_pred)
             n, h, w = patch_pred.shape[:3]
@@ -730,8 +732,8 @@ class ProcStepRawOutput(BaseCallbacks):
         step_cum_stat_dict = state_cum_output[1]
         for target_name in target_name_list:
             new_cum_dict = get_batch_stat(
-                step_pred_output[target_name],
                 step_true_output[target_name],
+                step_pred_output[target_name],
                 step_cum_stat_dict[target_name],
                 target_name,
                 channel_info

@@ -7,15 +7,15 @@
 # each img may have one or many annotations
 
 gland:
-  img_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Images/'
+  img_dir: 'dataset/MTL_sample/original_data/Gland/Images/'
   img_ext: '.png' # can also be a list of extension
-  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/' # only extract patches within tissue area
+  msk_dir: 'dataset/MTL_sample/original_data/Gland/Tissue/' # only extract patches within tissue area
   msk_ext: '.png'
-  split_info: '/root/lsf_workspace/train_data/mtl/info/info_gland.csv'
+  split_info: 'dataset/MTL_sample/original_data/info_gland.csv'
   nr_splits: 3
   ann_info: # Ann_Type : Ann_Dir, Ann_Ext
     Gland:
-      ann_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Labels_Gland/'
+      ann_dir: 'dataset/MTL_sample/original_data/Gland/Labels/'
       ann_ext: '.mat'
       channel_code: ['INST', 'TYPE']
   viz_info:
@@ -30,15 +30,15 @@ gland:
       ['nolabel', 'gland', 'surface-epi']
 
 lumen:
-  img_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Images/'
+  img_dir: 'dataset/MTL_sample/original_data/Lumen/Images/'
   img_ext: '.png' # can also be a list of extension
-  msk_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Tissue/' # only extract patches within tissue area
+  msk_dir: 'dataset/MTL_sample/original_data/Gland/Tissue/' # only extract patches within tissue area
   msk_ext: '.png'
-  split_info: '/root/lsf_workspace/train_data/mtl/info/info_lumen.csv'
+  split_info: 'dataset/MTL_sample/original_data/info_lumen.csv'
   nr_splits: 3
   ann_info: # Ann_Type : Ann_Dir, Ann_Ext
     Lumen:
-      ann_dir: '/root/lsf_workspace/train_data/mtl/Gland_Lumen/Labels_Lumen/'
+      ann_dir: 'dataset/MTL_sample/original_data/Lumen/Labels/'
       ann_ext: '.mat'
       channel_code: ['INST']
   viz_info:
@@ -52,15 +52,15 @@ lumen:
       ['nolabel', 'lumen']
 
 nuclei:
-  img_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Images/'
+  img_dir: 'dataset/MTL_sample/original_data/Nuclei/Images/'
   img_ext: '.png' # can also be a list of extension
-  msk_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Tissue/' # only extract patches within tissue area
+  msk_dir: 'dataset/MTL_sample/original_data/Nuclei/Tissue/' # only extract patches within tissue area
   msk_ext: '.png'
-  split_info: '/root/lsf_workspace/train_data/mtl/info/info_nuclei.csv'
+  split_info: 'dataset/MTL_sample/original_data/info_nuclei.csv'
   nr_splits: 3
   ann_info: 
     Nuclei:
-      ann_dir: '/root/lsf_workspace/train_data/mtl/Nuclei/Labels/'
+      ann_dir: 'dataset/MTL_sample/original_data/Nuclei/Labels/'
       ann_ext: '.mat'
       channel_code: ['INST', 'TYPE']
   viz_info:
@@ -77,3 +77,17 @@ nuclei:
     }
     type_names:
       ['nolabel', 'neutrophil', 'epithelial', 'lymphocyte', 'plasma', 'eosinophil', 'connective']
+
+tissue-type:
+  img_dir: "dataset/MTL_sample/original_data/Tissue-Type"
+  img_ext: ".png"
+  split_info: 'dataset/MTL_sample/original_data/info_tissue-type.csv'
+  nr_splits: 3
+  type_names:
+    ["background", "abnormal_epi", "normal_epi", "inflammatory", "muscle", "stroma", "debris", "mucous", "adipose"]
+
+
+
+
+
+

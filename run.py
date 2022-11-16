@@ -66,14 +66,20 @@ if __name__ == "__main__":
     root_logdir = args["--log_dir"]
     
     considered_data = []
-    if args["--gland_inst"] or args["--gland_class"]:
-        considered_data.append("Gland")
-    if args["--lumen_inst"]:
-        considered_data.append("Lumen")
-    if args["--nuclei_inst"] or args["--nuclei_class"]:
-        considered_data.append("Nuclei")
-    if args["--pclass"]:
-        considered_data.append("Patch-Class")
+    if not args["--gland_subtype"] and not args["--nuclei_subtype"]:
+        if args["--gland_inst"] or args["--gland_class"]:
+            considered_data.append("Gland")
+        if args["--lumen_inst"]:
+            considered_data.append("Lumen")
+        if args["--nuclei_inst"] or args["--nuclei_class"]:
+            considered_data.append("Nuclei")
+        if args["--pclass"]:
+            considered_data.append("Patch-Class")
+    else:
+        if args["--gland_subtype"]:
+            considered_data.append("Gland")
+        if args["--nuclei_subtype"]:
+            considered_data.append("Nuclei")
 
     warn = colored('WARNING:', 'red')
     print(f"{warn} Default data directory may be used - check command line arguments!")
@@ -130,7 +136,7 @@ if __name__ == "__main__":
                     if run_mode == 'infer':
                         # only consider small proportion for validation (faster)
                         file_path_list = random.sample(
-                            file_path_list, int(len(file_path_list) / 8))
+                            file_path_list, int(len(file_path_list) / 4))
                     if sub_ds_name != 'Patch-Class':
                         seg_ds = PatchSegClassDataset(
                             file_path_list, 'seg',
@@ -149,19 +155,19 @@ if __name__ == "__main__":
             input_dataset = MyConcatDataset(ds_list)
 
             # will replace the loader sampler with this sampler and overwrite batch aggregation
-            # such that each batch coming entirely from a single dataset
+            # such that each batch comes entirely from a single dataset
             loader_kwargs = paramset["loader_kwargs"]
             sampler_batch_size = loader_kwargs[subset_name]["batch_size"] * nr_gpus
             # fixed batch (single task per batch) & not patch classfication
-            if not args["--mix_target_in_batch"] and not args["--pclass"]:
+            if not args["--mix_target_in_batch"] and "Patch-Class" not in considered_data:
                 batch_sampler = SingleTaskBatchSampler(
                     input_dataset, sampler_batch_size, run_mode)
             # mixed batch (multiple tasks per batch) & not patch classfication
-            elif args["--mix_target_in_batch"] and not args["--pclass"]:
+            elif args["--mix_target_in_batch"] and "Patch-Class" not in considered_data:
                 batch_sampler = MixedTaskBatchSampler(
                     input_dataset, sampler_batch_size, run_mode)
             ## mixed batch (multiple tasks per batch) & patch classfication
-            elif args["--mix_target_in_batch"] and args["--pclass"]:
+            elif args["--mix_target_in_batch"] and "Patch-Class" in considered_data:
                 batch_sampler = MixedTaskBatchSampler2(
                     input_dataset, sampler_batch_size, run_mode)
 
@@ -180,7 +186,7 @@ if __name__ == "__main__":
         trainer.run()
         return
 
-    # determine how to group together data splits to form the folds
+    # determine how to group together data splits to form the folds - we assume 3 folds
     fold_info = {
         1: {"train": 1, "valid": 2},
         2: {"train": 2, "valid": 3},
@@ -194,15 +200,15 @@ if __name__ == "__main__":
         
         fold_data = {
             "train": OrderedDict([
-                ["Gland",       recur_find_ext(f"{gland_dir}/split_{fold_info_train}/996_996", ".dat")],
-                ["Lumen",       recur_find_ext(f"{lumen_dir}/split_{fold_info_train}/996_996", ".dat")],
-                ["Nuclei",      recur_find_ext(f"{nuclei_dir}/split_{fold_info_train}/996_996", ".dat")],
+                ["Gland",       recur_find_ext(f"{gland_dir}/split_{fold_info_train}/996_448", ".dat")],
+                ["Lumen",       recur_find_ext(f"{lumen_dir}/split_{fold_info_train}/996_448", ".dat")],
+                ["Nuclei",      recur_find_ext(f"{nuclei_dir}/split_{fold_info_train}/996_448", ".dat")],
                 ["Patch-Class", recur_find_ext(f"{pclass_dir}/split_{fold_info_train}", ".dat")],
             ]),
             "valid": OrderedDict([
-                ["Gland",       recur_find_ext(f"{gland_dir}/split_{fold_info_valid}/996_996", ".dat")],
-                ["Lumen",       recur_find_ext(f"{lumen_dir}/split_{fold_info_valid}/996_996", ".dat")],
-                ["Nuclei",      recur_find_ext(f"{nuclei_dir}/split_{fold_info_valid}/996_996", ".dat")],
+                ["Gland",       recur_find_ext(f"{gland_dir}/split_{fold_info_valid}/996_448", ".dat")],
+                ["Lumen",       recur_find_ext(f"{lumen_dir}/split_{fold_info_valid}/996_448", ".dat")],
+                ["Nuclei",      recur_find_ext(f"{nuclei_dir}/split_{fold_info_valid}/996_448", ".dat")],
                 ["Patch-Class", recur_find_ext(f"{pclass_dir}/split_{fold_info_valid}", ".dat")],
             ]),
         }
@@ -212,31 +218,35 @@ if __name__ == "__main__":
 
             # get encoder name and target information to use in logdir output
             backbone = paramset["model_kwargs"]["encoder_backbone_name"]
-            targets = list(paramset["model_kwargs"]["decoder_kwargs"].keys())
+            targets = considered_tasks
             separator = "_"
             targets = separator.join(targets)
 
             # get encoder name
             backbone = paramset["model_kwargs"]["encoder_backbone_name"]
-
-            pretrained = args["--pretrained"].lower()
-            if pretrained == 'imagenet':
-                paramset["model_kwargs"]["backbone_imagenet_pretrained"] = True
-                paramset["model_kwargs"]["fullnet_custom_pretrained"] = False
-                pretrained_path = None
-            elif pretrained in ['random', 'mtl', 'imagenet_mtl', 'imagenet_mtl_class', 'custom']:
-                paramset["model_kwargs"]["backbone_imagenet_pretrained"] = False
-                if pretrained == 'random':
+            
+            pretrained = args["--pretrained"]
+            if pretrained[-3:] == "tar" or pretrained[-3:] == "pth":
+                pretrained_path = pretrained
+            else:
+                pretrained = pretrained.lower()
+                if pretrained == 'imagenet':
+                    paramset["model_kwargs"]["backbone_imagenet_pretrained"] = True
                     paramset["model_kwargs"]["fullnet_custom_pretrained"] = False
                     pretrained_path = None
+                elif pretrained in ['random', 'mtl', 'imagenet_mtl', 'imagenet_mtl_class', 'custom']:
+                    paramset["model_kwargs"]["backbone_imagenet_pretrained"] = False
+                    if pretrained == 'random':
+                        paramset["model_kwargs"]["fullnet_custom_pretrained"] = False
+                        pretrained_path = None
+                    else:
+                        paramset["model_kwargs"]["fullnet_custom_pretrained"] = True
+                        with open(args.pretrained_info) as fptr:
+                            pretrained_info = yaml.full_load(fptr)
+                            pretrained_path = pretrained_info[backbone][f"fold{fold_info_train}"][pretrained]
                 else:
-                    paramset["model_kwargs"]["fullnet_custom_pretrained"] = True
-                    with open(args.pretrained_info) as fptr:
-                        pretrained_info = yaml.full_load(fptr)
-                        pretrained_path = pretrained_info[backbone][f"fold{fold_info_train}"][pretrained]
-            else:
-                raise ValueError(
-                    "`pretrained` argument not recognised. Provide one of `random`, `imagenet`, `mtl`, `imagenet_mtl` or `imagenet_mtl_class`!")
+                    raise ValueError(
+                        "`pretrained` argument not recognised. Provide one of `random`, `imagenet`, `mtl`, `imagenet_mtl` or `imagenet_mtl_class`!")
 
         save_path = "%s/%s/%s/fold%s/%s/" % (
             root_logdir,

@@ -2,8 +2,23 @@
 
 Patch extraction script. This replicates the strategy that was used for the original paper, using
 3-fold cross validation. The script can be modified for your own needs.
+
+Usage:
+  extract_patches.py [--output_dir=<path>] [--win_size=<n>] [--step_size=<n>] [--extract_type=<str>]
+  extract_patches.py (-h | --help)
+  extract_patches.py --version
+
+Options:
+  -h --help               Show this string.
+  --version               Show version.
+  --output_dir=<path>     Root path where patches will be saved.
+  --win_size=<n>          Size of patches to extract. [default: 996]
+  --step_size=<n>         Stride used during patch extraction. [default: 448]
+  --extract_type=<str>    Whether to use `mirror` or `valid` padding at boundary during patch extraction. [default: valid]
+
 """
 
+from docopt import docopt
 import logging
 import os
 import pathlib
@@ -44,6 +59,7 @@ def load_msk(base_name, ds_info):
         msk = msk[..., None]
     return msk
 
+
 def load_img(base_name, ds_info):
     """Load image file."""
     img_dir = ds_info["img_dir"]
@@ -52,6 +68,7 @@ def load_img(base_name, ds_info):
     img = cv2.imread(file_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # BGR to RGB
     return img
+
 
 def load_ann(basename, ds_info, ann_type, use_channel_list):
     """Load annotation file."""
@@ -116,6 +133,7 @@ def load_ann(basename, ds_info, ann_type, use_channel_list):
 
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
+    args = docopt(__doc__)
 
     logging.basicConfig(
         level=logging.DEBUG,
@@ -124,10 +142,10 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler()],
     )
 
-    win_size = 996 # double the size of segmentation patch input size
-    step_size = 996 # 448 for glands / lumen. 224 for nuclei
-    extract_type = "valid" # `valid`` or `mirror``. `valid` doesn't perform mirror padding at boundary
-    save_root = "/root/lsf_workspace/train_data/mtl/patches/" # where the data will be saved!
+    win_size = int(args['--win_size']) # double the size of segmentation patch input size
+    step_size = int(args['--step_size']) # 448 for glands / lumen. 224 for nuclei
+    extract_type = args["--extract_type"] # `valid`` or `mirror``. `valid` doesn't perform mirror padding at boundary
+    save_root = args["--output_dir"] # where the data will be saved!
 
     warn = colored('WARNING:', 'red')
     warn_win_size = colored('win_size', 'green')
@@ -135,11 +153,9 @@ if __name__ == "__main__":
     print(f"{warn} The selected {warn_win_size} and {warn_step_size} will need to be incorporated into the `fold_data` dict in run.py!")
 
     use_channel_list = ["INST", "TYPE"]
-    ann_type_list = ["Gland", "Lumen", "Nuclei"]
 
     # extract patches for these datasets
-    ds_list = ["gland", "lumen", "nuclei"]
-    # ds_list = ["lumen"]
+    ds_list = ["gland", "lumen", "nuclei", "tissue-type"]
     xtractor = PatchExtractor(win_size, step_size)
 
     with open("dataset.yml") as fptr:
@@ -155,20 +171,25 @@ if __name__ == "__main__":
         img_dir = ds_info["img_dir"]
         img_ext = ds_info["img_ext"]
         split_info = pd.read_csv(ds_info["split_info"])
+        if ds_name == "tissue-type":
+            type_names = ds_info["type_names"]
 
         out_dir_root = "%s/%s" % (save_root, ds_name)
         # extract patches in separate directories according to the dataset split
-        nr_splits = ds_info["nr_splits"] + 1 # 3 folds + external test
+        nr_splits = ds_info["nr_splits"] 
+
         for split_nr in range(nr_splits):
-            out_dir_tmp = out_dir_root + "/split_%d/%d_%d" % (
-                split_nr + 1,
-                win_size,
-                step_size,
-            )
+            if ds_name is not "tissue-type":
+                out_dir_tmp = out_dir_root + "/split_%d/%d_%d" % (
+                    split_nr + 1,
+                    win_size,
+                    step_size,
+                )
+            else:
+                out_dir_tmp = out_dir_root + "/split_%d" % (split_nr + 1)
             rm_n_mkdir(out_dir_tmp)
 
         file_path_list = recur_find_ext(img_dir, img_ext)
-        file_path_list = file_path_list[:30]
 
         pbar_format = "Process File: |{bar}| {n_fmt}/{total_fmt}[{elapsed}<{remaining},{rate_fmt}]"
         pbarx = tqdm.tqdm(
@@ -180,54 +201,71 @@ if __name__ == "__main__":
             split_nr = split_info.loc[split_info["Filename"] == basename, "Split"].iloc[
                 0
             ]
-            # if split_nr <= nr_splits and split_nr > 0:
-            if split_nr > 0:
-                out_dir = out_dir_root + "/split_%d/%d_%d" % (
-                    split_nr,
-                    win_size,
-                    step_size,
-                )
-                img = load_img(basename, ds_info)
-                msk = load_msk(basename, ds_info)
-                ann = load_ann(basename, ds_info, ds_name, use_channel_list)
-                if ann is None:
-                    # no annotation detected, skip
-                    log_info("`%s` has no annotation `%s`." % (basename, ann_type_list))
-                    continue
-                ann, ch_code = ann
-
-                img = np.concatenate([img, msk, ann], axis=-1)
-                sub_patches = xtractor.extract(img, extract_type)
-
-                pbar_format = "Extracting  : |{bar}| {n_fmt}/{total_fmt}[{elapsed}<{remaining},{rate_fmt}]"
-                pbar = tqdm.tqdm(
-                    total=len(sub_patches),
-                    leave=False,
-                    bar_format=pbar_format,
-                    ascii=True,
-                    position=1,
-                )
-
-                for idx, patch in enumerate(sub_patches):
-                    patch_img = patch[..., :3]
-                    patch_msk = patch[..., 3]
-                    patch_ann = patch[..., 4:]
-
-                    if np.sum(patch_msk) <= 0:
+            if ds_name is not "tissue-type":
+                # if split_nr <= nr_splits and split_nr > 0:
+                if split_nr > 0:
+                    out_dir = out_dir_root + "/split_%d/%d_%d" % (
+                        split_nr,
+                        win_size,
+                        step_size,
+                    )
+                    img = load_img(basename, ds_info)
+                    msk = load_msk(basename, ds_info)
+                    ann = load_ann(basename, ds_info, ds_name, use_channel_list)
+                    if ann is None:
+                        # no annotation detected, skip
+                        log_info("`%s` has no annotation." % basename)
                         continue
+                    ann, ch_code = ann
 
+                    img = np.concatenate([img, msk, ann], axis=-1)
+                    sub_patches = xtractor.extract(img, extract_type)
+
+                    pbar_format = "Extracting  : |{bar}| {n_fmt}/{total_fmt}[{elapsed}<{remaining},{rate_fmt}]"
+                    pbar = tqdm.tqdm(
+                        total=len(sub_patches),
+                        leave=False,
+                        bar_format=pbar_format,
+                        ascii=True,
+                        position=1,
+                    )
+
+                    for idx, patch in enumerate(sub_patches):
+                        patch_img = patch[..., :3]
+                        patch_msk = patch[..., 3]
+                        patch_ann = patch[..., 4:]
+
+                        if np.sum(patch_msk) <= 0:
+                            continue
+
+                        joblib.dump(
+                            {
+                                "img": patch_img.astype(np.uint8),
+                                "ann": patch_ann.astype(np.int32),
+                                "channel_code": ch_code,
+                            },
+                            "%s/%s-%04d.dat" % (out_dir, basename, idx),
+                        )
+                        assert patch.shape[0] == win_size
+                        assert patch.shape[1] == win_size
+                pbar.update()
+                pbar.close()
+
+            else:
+                class_name = file_path.split("/")[-2] # folder name indicates class name
+                ann = type_names.index(class_name)
+                if split_nr > 0:
+                    out_dir = out_dir_root + "/split_%d" % split_nr
+                    patch_img = cv2.imread(file_path)
+                    patch_img = cv2.cvtColor(patch_img, cv2.COLOR_BGR2RGB) # BGR to RGB
                     joblib.dump(
                         {
                             "img": patch_img.astype(np.uint8),
-                            "ann": patch_ann.astype(np.int32),
-                            "channel_code": ch_code,
+                            "ann": int(ann),
+                            "channel_code": ["Patch-Class"],
                         },
-                        "%s/%s-%04d.dat" % (out_dir, basename, idx),
+                        "%s/%s.dat" % (out_dir, basename),
                     )
-                    assert patch.shape[0] == win_size
-                    assert patch.shape[1] == win_size
-            pbar.update()
-            pbar.close()
 
             pbarx.update()
         pbarx.close()
