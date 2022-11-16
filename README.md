@@ -51,7 +51,9 @@ The purpose of the main scripts in the repository:
 
 Before initialising training, ensure patches are appropriately extracted using `extract_patches.py`. This is only applicable for our segmentation tasks (gland, lumen and nucleus segmentation).
 
-Cerberus uses input patches of size of 448x448 for segmentation. For this, we extract a patches double the size (996x996) [set by `win_size` in the script] and then perform a central crop after augmentation. `step_size` determines the stride used during patch extraction. We use 448 for gland/lumen segmentation tasks and 224 for the nucleus segmentation task. All other information, including the image paths, annotation file extension and fold information (`split_info`) should be populated in `dataset.yml`.
+Cerberus uses input patches of size of 448x448 for segmentation. For this, we extract a patches double the size (996x996) [set by `win_size` in the script] and then perform a central crop after augmentation. `step_size` determines the stride used during patch extraction. We use 448 for gland/lumen segmentation tasks and 224 for the nucleus segmentation task. All other information, including the image paths, annotation file extension and fold information (`split_info`) should be populated in `dataset.yml`. The script also converts data for patch classification into the appropriate format. 
+
+We have provided a sample dataset to help with data curation and MTL debugging. Here, data from the `original_data` folder is converted into data in the `patches` folder for training. Download the sample data at [this webpage](https://warwick.ac.uk/fac/cross_fac/tia/software/cerberus/).
 
 Upon extracting patches, it's time to unleash training. For this, modify the command line arugments in `run.py` enter `python run.py -h` for a full description.
 
@@ -68,6 +70,14 @@ If performing multi-task gland, lumen and nuclei instance segmentation, along wi
 ```
 python run.py --gpu="0" --gland_inst --gland_dir=<path> --lumen_inst --lumen_dir=<path> --nuclei_inst --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path>
 ```
+
+You can also simultaneously perform nuclear and gland classification by adding the `gland_class` and `nuclei_class` arguments. However, in our paper we perform the object subtyping in a second step after freezing the initially trained weights of the network. To perform nuclei subtyping using our strategy, use the following command:
+
+```
+python run.py --gpu="0" --gland_inst --gland_dir=<path> --lumen_inst --lumen_dir=<path> --nuclei_inst --nuclei_class --nuclei_subtype --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path> --pretrained=<str>
+```
+
+Using the `nuclei_subtype` argument ensures that the other parts of the network are frozen. Otherwise, the entire network will be trained. When using the two-stage strategy for subtyping, you will also need to provide the weights from the first stage using the `pretrained` argument. For this, you can explicitly include the path to the weights or you can add the paths in `models/pretrained.yml`. If adding paths to the yaml file, ensure that the correct argument is specified to utilise the appropriate weights. We have included stage one weights obtained from each fold after training with multi-task learning. Links are provided [later](#download-weights) in this file.
 
 Alongside the above, other model details and hyperparameters must be set in `paramset.yml`, including batch size, learning rate, and target output. Also ensure the utilised decoder kwargs, along with the appopriate number of channels are defined - this must align with the tasks specified in the command line arguments above!
 
@@ -103,10 +113,10 @@ In this repository, we enable the download of:
     - Nuclear semantic segmentation (classification)
     - Lumen instance segmentation
     - Tissue type patch classification
-- ResNet weights for transfer learning:
-- Weights obtained from training each fold using:
-    - ImageNet pretrained weights and MTL
-    - ImageNet pretrained weights and MTL (with patch classification)
+- Pretrained ResNet weights (torchvision compatible) for transfer learning
+- Pretrained weights obtained from training each fold using:
+    - ImageNet weights and MTL
+    - ImageNet weights and MTL (with patch classification)
 
 Download all of the above weights by visiting [this page](https://warwick.ac.uk/fac/cross_fac/tia/software/cerberus/).
 
