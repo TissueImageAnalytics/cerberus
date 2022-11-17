@@ -95,12 +95,12 @@ For convenience, we have also included a bash script, where you can populate com
 To process whole-slide images, run:
 
 ```
-python run_infer_wsi.py --gpu=<gpu_id> --batch_size=<n> --model=<path> --input_dir=<path>  --output_dir=<path> 
+python run_infer_wsi.py --gpu=<gpu_id> --batch_size=<n> --model=<path> --input_dir=<path>  mask_dir=<path> --output_dir=<path> 
 ```
 
 Similar to the tile mode, we have included an example bash script (`run_wsi.sh`) that can be used to run the command, without having to always re-enter the arguments.
 
-For both tile and WSI inference, the model path should point to a directory containing the settings file and the weights (`.tar` file). 
+For both tile and WSI inference, the model path should point to a directory containing the settings file and the weights (`.tar` file). You will see from the above command that there is a `mask_dir` argument. In this repo, we assume that tissue masks have been automatically generated. You should include masks - otherwise it will lead to significantly longer processing times.
 
 ## Download Weights
 
