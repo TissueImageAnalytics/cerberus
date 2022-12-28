@@ -135,7 +135,7 @@ def _post_process_patches(patch_info_list, image_info, postproc_code=None, postp
 
     # * reassemble the prediction
     ch_code_list = list(patch_info_list[0][0].keys())
-    
+
     out_br_list = np.array([v[1][1] for v in patch_info_list])
     hw = np.max(out_br_list, axis=0).tolist()
     ovl_canvas = np.zeros(hw + [nr_out_chs], dtype=np.float32)
@@ -171,7 +171,6 @@ def _post_process_patches(patch_info_list, image_info, postproc_code=None, postp
     pred_inst_info_dict = {}
     pclass_map = None
     # for tissue_code in tissue_code_list:
-    #! below is temporary - remove when sensible!
     #TODO postproc needs to be replaced with tissue_code_list!
     for tissue_code in postproc_list:
         tissue_code = tissue_code.capitalize()
@@ -184,7 +183,7 @@ def _post_process_patches(patch_info_list, image_info, postproc_code=None, postp
             pred_inst_map_dict[tissue_code] = pred_inst_map
             pred_type_map_dict[tissue_code] = pred_type_map
         elif tissue_code == 'Patch-class':
-            pclass_map = raw_canvas[..., ch_code_list.index('Patch-Class')]
+            pclass_map = raw_canvas[..., idx_dict["Patch-Class"][0]]
         
     # remove lumen predictions not inside glands!
     if 'lumen' in postproc_list and 'gland' in postproc_list:
