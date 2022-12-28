@@ -170,8 +170,6 @@ def _post_process_patches(patch_info_list, image_info, postproc_code=None, postp
     pred_type_map_dict = {}
     pred_inst_info_dict = {}
     pclass_map = None
-    # for tissue_code in tissue_code_list:
-    #TODO postproc needs to be replaced with tissue_code_list!
     for tissue_code in postproc_list:
         tissue_code = tissue_code.capitalize()
         if tissue_code + "-INST" in postproc_code.keys():
