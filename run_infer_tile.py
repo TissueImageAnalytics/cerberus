@@ -2,8 +2,8 @@
 
 Usage:
   run_infer_tile.py [--gpu=<id>] [--model=<path>] [--nr_inference_workers=<n>] \
-            [--nr_post_proc_workers=<n>] [--batch_size=<n>] [--tile_shape=<n>] \
-            [--input_dir=<path>] [--output_dir=<path>] [--patch_input_shape=<n>] [--patch_output_shape=<n>]
+            [--nr_post_proc_workers=<n>] [--batch_size=<n>] [--input_dir=<path>] \
+            [--output_dir=<path>] [--patch_input_shape=<n>] [--patch_output_shape=<n>]
   run_infer_tile.py (-h | --help)
   run_infer_tile.py --version
 
@@ -15,7 +15,6 @@ Options:
   --nr_inference_workers=<n>  Number of workers during inference. [default: 0]
   --nr_post_proc_workers=<n>  Number of workers during post-processing. [default: 0]
   --batch_size=<n>            Batch size. [default: 10]
-  --tile_shape=<n>            Shape of tile for processing. [default: 2048]
   --input_dir=<path>          Path to input data directory. Assumes the files are not nested within directory.
   --output_dir=<path>         Path to output data directory. Will create automtically if doesn't exist. [default: output/]
   --patch_input_shape=<n>     Shape of input patch to the network- Assume square shape. [default: 448]
