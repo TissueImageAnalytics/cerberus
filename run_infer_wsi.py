@@ -49,8 +49,6 @@ from misc.utils import rm_n_mkdir
 if __name__ == "__main__":
     args = docopt(__doc__, version="CoBi Gland Inference")
 
-    args["--cache_path"] = "/root/dgx_workspace/cache/"
-
     if args["--gpu"]:
        os.environ["CUDA_VISIBLE_DEVICES"] = args["--gpu"]
 
