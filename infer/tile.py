@@ -281,10 +281,10 @@ class InferManager(base.InferManager):
                 )
             
             if pclass_map is not None:
-                mkdir("%s/pclass/" % save_root_dir)
-                cv2.imwrite(
-                    "%s/pclass/%s.png" % (save_root_dir, base_name),
-                    pclass_map)
+                mkdir("%s/pclass_mat/" % save_root_dir)
+                sio.savemat(
+                    "%s/pclass_mat/%s.mat" % (save_root_dir, base_name),
+                    {"pclass": pclass_map})
             return
 
         proc_pool = None
