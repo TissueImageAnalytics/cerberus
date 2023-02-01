@@ -146,7 +146,7 @@ def _process_tile_predictions(
     idx_dict = {"Nuclei-INST": [0, 2], "Nuclei-TYPE": [2, 4]}  # channel starting idx
     raw_map = np.concatenate([np.array(inst_ptr), np.array(type_ptr)], axis=-1)
     inst_map, type_map = postproc.post_process(raw_map, idx_dict, "Nuclei")
-    inst_dict = HoVerNet._get_instance_info(inst_map, type_map)
+    inst_dict = HoVerNet.get_instance_info(inst_map, type_map)
     # should be rare, no nuclei detected in input images
     if len(inst_dict) == 0:
         return {}, []
@@ -454,7 +454,6 @@ class InferManager(base.InferManager):
         locations: Union[List, np.ndarray],
         save_path: Union[str, pathlib.Path] = None,
         cache_count_path: Union[str, pathlib.Path] = None,
-        free_prediction: bool = True,
     ):
         return NucleusInstanceSegmentor.merge_prediction(
             canvas_shape,
@@ -462,7 +461,6 @@ class InferManager(base.InferManager):
             locations,
             save_path,
             cache_count_path,
-            free_prediction,
         )
 
     def _merge_inst_results(self, inst_dict, futures, has_workers=False):
@@ -615,7 +613,6 @@ class InferManager(base.InferManager):
                     patch_locations,
                     save_path=cache_raw_paths[idx],
                     cache_count_path=cache_count_paths[idx],
-                    free_prediction=True,
                 )
 
         end = time.perf_counter()
