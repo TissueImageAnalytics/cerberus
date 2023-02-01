@@ -524,7 +524,7 @@ class InferManager(base.InferManager):
         self.wsi_proc_shape = self.wsi_proc_shape[::-1]
         
         self.wsi_base_mag = self.wsi_handler.info.mpp # get scan resolution of WSI
-        self.wsi_base_shape = self.wsi_handler.slide_dimensions({"resolution": self.base_mag, "units": "mpp"})
+        self.wsi_base_shape = self.wsi_handler.slide_dimensions(self.wsi_base_mag, "mpp")
         self.wsi_base_shape = self.wsi_base_shape[::-1] # to YX
 
         if mask_path is not None and os.path.isfile(mask_path):
@@ -539,7 +539,7 @@ class InferManager(base.InferManager):
             cv2.imwrite(f"{self.output_dir}/mask/{wsi_basename}.png", self.wsi_mask*255)
         if self.save_thumb:
             # thumbnail at 1.25x objective magnification
-            wsi_thumb = self.slide_thumbnail(resolution=1.25, units="power") 
+            wsi_thumb = self.wsi_handler.slide_thumbnail(resolution=1.25, units="power") 
             cv2.imwrite(f"{self.output_dir}/thumb/{wsi_basename}.png", wsi_thumb)
             
         # warning, the value within this is uninitialized
