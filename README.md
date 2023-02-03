@@ -33,53 +33,15 @@ pip install torch==1.10.1+cu102 torchvision==0.11.2+cu102 -f https://download.py
 Below we outline the contents of the directories in the repository.
 
 - `infer`: Inference scripts
-- `loader`: Data loading, augmentation and post processing scripts
+- `loader`: Data loading and post processing scripts
 - `misc`: Miscellaneous scripts and functions
 - `models`: Scripts relating to model definition and hyperparameters
 - `run_utils`: Model engine and callbacks
 
 The purpose of the main scripts in the repository:
 
-- `run.py`: Script for triggering multi-task training
-- `run_train.py`: Main training script - triggered via `run.py` 
 - `run_infer_tile.py`: Run inference on image tiles
 - `run_infer_wsi.py`: Run inference on whole-slide images
-- `extract_patches.py`: Extract patches from image tiles for multi-task learning
-- `dataset.yml`: Defines the dataset paths and information
-
-## Training 
-
-Before initialising training, ensure patches are appropriately extracted using `extract_patches.py`. This is only applicable for our segmentation tasks (gland, lumen and nucleus segmentation).
-
-Cerberus uses input patches of size of 448x448 for segmentation. For this, we extract a patches double the size (996x996) [set by `win_size` in the script] and then perform a central crop after augmentation. `step_size` determines the stride used during patch extraction. We use 448 for gland/lumen segmentation tasks and 224 for the nucleus segmentation task. All other information, including the image paths, annotation file extension and fold information (`split_info`) should be populated in `dataset.yml`. The script also converts data for patch classification into the appropriate format. 
-
-We have provided a sample dataset to help with data curation and MTL debugging. Here, data from the `original_data` folder is converted into data in the `patches` folder for training. Download the sample data at [this webpage](https://warwick.ac.uk/fac/cross_fac/tia/software/cerberus/).
-
-Upon extracting patches, it's time to unleash training. For this, modify the command line arugments in `run.py` enter `python run.py -h` for a full description.
-
-In particular, you can toggle different tasks, set the pretrained weights, determine the batch type and set the paths to the input data. 
-
-For example, if performing single task nuclear instance segmentation on a single GPU with a mixed batch, use:
-
-```
-python run.py --gpu="0" --nuclei_inst --nuclei_dir=<path> --mix_target_in_batch --log_dir=<path>
-```
-
-If performing multi-task gland, lumen and nuclei instance segmentation, along with patch classification use:
-
-```
-python run.py --gpu="0" --gland_inst --gland_dir=<path> --lumen_inst --lumen_dir=<path> --nuclei_inst --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path>
-```
-
-You can also simultaneously perform nuclear and gland classification by adding the `gland_class` and `nuclei_class` arguments. However, in our paper we perform the object subtyping in a second step after freezing the initially trained weights of the network. To perform nuclei subtyping using our strategy, use the following command:
-
-```
-python run.py --gpu="0" --gland_inst --gland_dir=<path> --lumen_inst --lumen_dir=<path> --nuclei_inst --nuclei_class --nuclei_subtype --nuclei_dir=<path> --pclass --pclass_dir=<path> --mix_target_in_batch --log_dir=<path> --pretrained=<str>
-```
-
-Using the `nuclei_subtype` argument ensures that the other parts of the network are frozen. Otherwise, the entire network will be trained. When using the two-stage strategy for subtyping, you will also need to provide the weights from the first stage using the `pretrained` argument. For this, you can explicitly include the path to the weights or you can add the paths in `models/pretrained.yml`. If adding paths to the yaml file, ensure that the correct argument is specified to utilise the appropriate weights. We have included stage one weights obtained from each fold after training with multi-task learning. Links are provided [later](#download-weights) in this file.
-
-Alongside the above, other model details and hyperparameters must be set in `paramset.yml`, including batch size, learning rate, and target output. Also ensure the utilised decoder kwargs, along with the appopriate number of channels are defined - this must align with the tasks specified in the command line arguments above!
 
 ## Inference
 ### Tiles
