@@ -15,6 +15,7 @@ from collections import OrderedDict
 from typing import List, Tuple, Union
 
 import cv2
+import scipy.io as sio
 import numpy as np
 import torch
 import torch.multiprocessing as torch_mp
@@ -379,10 +380,14 @@ class InferManager(base.InferManager):
 
     def _get_tissue_info(self):
         tissue_info = []
-        for tissue_region_id in np.unique(self.wsi_mask_lab)[1:]:
-            tissue_region = self.wsi_mask_lab == tissue_region_id
-            rmin, rmax, cmin, cmax = get_bounding_box(tissue_region)
-            tissue_info.append([rmin, rmax, cmin, cmax])
+        mask_list = np.unique(self.wsi_mask_lab).tolist()
+        if len(mask_list) > 1:
+            for tissue_region_id in mask_list[1:]:
+                tissue_region = self.wsi_mask_lab == tissue_region_id
+                rmin, rmax, cmin, cmax = get_bounding_box(tissue_region)
+                tissue_info.append([rmin, rmax, cmin, cmax])
+        else:
+            tissue_info.append([0, self.wsi_mask_lab.shape[0], 0, self.wsi_mask_lab.shape[1]])
         return tissue_info
 
     def _get_resized_map(self, mmap_path, ds_factor, read_size):
@@ -619,11 +624,11 @@ class InferManager(base.InferManager):
         self.logger.info("Inference Time: {0}".format(end - start))
 
         head_names = [
+            "Nuclei-INST",
+            "Nuclei-TYPE",
             "Gland-INST",
             "Gland-TYPE",
             "Lumen-INST",
-            "Nuclei-INST",
-            "Nuclei-TYPE",
             "Patch-Class",
         ]
         head_caches = list(zip(head_names, cache_raw_paths))
@@ -705,7 +710,10 @@ class InferManager(base.InferManager):
             )
             pclass_map *= lores_wsimask
             del lores_wsimask # free memory
-            cv2.imwrite("%s/tissue/%s.png" % (output_dir, wsi_basename), pclass_map)
+            sio.savemat(
+                "%s/tissue/%s.mat" % (output_dir, wsi_basename),
+                {"pclass": pclass_map}
+                )
 
         end = time.perf_counter()
         self.logger.info("Tissue Region Post Proc Time: {0}".format(end - start))
@@ -759,8 +767,9 @@ class InferManager(base.InferManager):
                                 (tile_pred_map.shape[1], tile_pred_map.shape[0]),
                                 interpolation=cv2.INTER_NEAREST,
                             )
+                        if mask_idx.ndim == 2:
                             mask_idx = np.expand_dims(mask_idx, -1)
-
+         
                         tile_pred_map *= mask_idx
                         tile_pred_list.append(tile_pred_map)
                         new_idx_dict[tissue_code + "-%s" % output_type] = [
@@ -871,6 +880,7 @@ class InferManager(base.InferManager):
         if self.save_mask:
             if not os.path.exists(self.output_dir + "/mask/"):
                 rm_n_mkdir(self.output_dir + "/mask/")
+        
 
         self.num_loader_workers = 12
         self.num_postproc_workers = 6
