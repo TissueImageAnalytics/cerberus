@@ -8,93 +8,61 @@ from scipy.ndimage.morphology import binary_fill_holes
 
 from misc.utils import get_bounding_box
 
-
 def get_inst_info_dict(inst_map, type_map, ds_factor=1.0):
     # get json information
-    inst_info_dict = None
-    inst_id_list = np.unique(inst_map)[1:]  # exclude background
     inst_info_dict = {}
-    for inst_id in inst_id_list:
-        single_inst_map = inst_map == inst_id
-        # TODO: change format of bbox output
-        rmin, rmax, cmin, cmax = get_bounding_box(single_inst_map)
-        inst_bbox = np.array([[rmin, cmin], [rmax, cmax]])
-        single_inst_map = single_inst_map[
-            inst_bbox[0][0] : inst_bbox[1][0], inst_bbox[0][1] : inst_bbox[1][1]
-        ]
-        single_inst_map = single_inst_map.astype(np.uint8)
-        inst_moment = cv2.moments(single_inst_map)
-        inst_contour = cv2.findContours(
-            single_inst_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
-        # * opencv protocol format may break
-        inst_contour = np.squeeze(inst_contour[0][0].astype("int32"))
-        # < 3 points dont make a contour, so skip, likely artifact too
-        # as the contours obtained via approximation => too small or sthg
-        if inst_contour.shape[0] < 3:
-            continue
-        if len(inst_contour.shape) != 2:
-            continue  # ! check for too small a contour
-        inst_centroid = [
-            (inst_moment["m10"] / inst_moment["m00"]),
-            (inst_moment["m01"] / inst_moment["m00"]),
-        ]
-        inst_centroid = np.array(inst_centroid)
-        inst_contour[:, 0] += inst_bbox[0][1] # X
-        inst_contour[:, 1] += inst_bbox[0][0] # Y
-        inst_centroid[0] += inst_bbox[0][1] # X
-        inst_centroid[1] += inst_bbox[0][0] # Y
+    inst_id_list = np.unique(inst_map)[1:]  # exclude background
+    if type_map is not None:
+        type_list = np.unique(type_map)
+    else:
+        type_list = None
 
-        # inst_id should start at 1
-        inst_info_dict[inst_id] = {  
+    # Calculate instance information for each instance ID
+    for inst_id in inst_id_list:
+        single_inst_map = (inst_map == inst_id).astype(np.uint8)
+
+        # Get bounding box and crop instance map
+        rmin, cmin = np.min(np.nonzero(single_inst_map), axis=1)
+        rmax, cmax = np.max(np.nonzero(single_inst_map), axis=1) + 1
+        inst_bbox = np.array([[rmin, cmin], [rmax, cmax]])
+        single_inst_map = single_inst_map[rmin:rmax, cmin:cmax]
+
+        # Calculate centroid
+        inst_moment = cv2.moments(single_inst_map)
+        inst_centroid = np.array([inst_moment["m10"], inst_moment["m01"]]) / inst_moment["m00"]
+        inst_centroid += inst_bbox[0]
+
+        # Calculate contour
+        inst_contour, _ = cv2.findContours(single_inst_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        inst_contour = np.squeeze(inst_contour[0].astype(np.int32))
+        inst_contour[:, 0] += cmin
+        inst_contour[:, 1] += rmin
+
+        # Calculate type information
+        if type_list is not None:
+            inst_type_crop = type_map[rmin:rmax, cmin:cmax]
+            inst_type = np.argmax(np.bincount(inst_type_crop[single_inst_map]))
+            inst_type_prob = np.sum(inst_type_crop == inst_type) / np.sum(single_inst_map)
+        else:
+            inst_type = None
+            inst_type_prob = None
+
+        # Add instance information to dictionary
+        inst_info_dict[inst_id] = {
             "box": inst_bbox,
             "centroid": inst_centroid,
             "contour": inst_contour,
+            "type": inst_type,
+            "type_prob": inst_type_prob,
         }
 
-    if type_map is not None:
-        #### * Get class of each instance id, stored at index id-1
-        for inst_id in list(inst_info_dict.keys()):
-            rmin, cmin, rmax, cmax = (inst_info_dict[inst_id]["box"]).flatten()
-            inst_map_crop = inst_map[rmin:rmax, cmin:cmax]
-            inst_type_crop = type_map[rmin:rmax, cmin:cmax]
-            inst_map_crop = (
-                inst_map_crop == inst_id
-            )  # TODO: duplicated operation, may be expensive
-            inst_type = inst_type_crop[inst_map_crop]
-            type_list, type_pixels = np.unique(inst_type, return_counts=True)
-            type_list = list(zip(type_list, type_pixels))
-            type_list = sorted(type_list, key=lambda x: x[1], reverse=True)
-            inst_type = type_list[0][0]
-            if inst_type == 0:  # ! pick the 2nd most dominant if exist
-                if len(type_list) > 1:
-                    inst_type = type_list[1][0]
-            type_dict = {v[0]: v[1] for v in type_list}
-            type_prob = type_dict[inst_type] / (np.sum(inst_map_crop) + 1.0e-6)
-            inst_info_dict[inst_id]["type"] = int(inst_type)
-            inst_info_dict[inst_id]["type_prob"] = float(type_prob)
-
-    # resize to resolution used for processing
+    # Resize instance information if necessary
     if ds_factor != 1.0:
-        for inst_id in list(inst_info_dict.keys()):
-            inst_bbox = inst_info_dict[inst_id]["box"]
-            inst_centroid = inst_info_dict[inst_id]["centroid"]
-            inst_contour = inst_info_dict[inst_id]["contour"]
-            if "type" in inst_info_dict[inst_id].keys():
-                inst_type = inst_info_dict[inst_id]["type"]
-                inst_type_prob = inst_info_dict[inst_id]["type_prob"]
-            else:
-                inst_type = None
-                inst_type_prob = None
-            inst_info_dict[inst_id] = {  
-                    "box": np.round(inst_bbox / ds_factor).astype('int'),
-                    "centroid": np.round(inst_centroid / ds_factor).astype('int'),
-                    "contour": np.round(inst_contour /ds_factor).astype('int'),
-                }
-            if inst_type is not None:
-                inst_info_dict[inst_id]["type"] = inst_type
-                inst_info_dict[inst_id]["type_prob"] = inst_type_prob
-                
+        for inst_id in inst_info_dict:
+            inst_info_dict[inst_id]["box"] = np.round(inst_info_dict[inst_id]["box"] / ds_factor).astype(np.int)
+            inst_info_dict[inst_id]["centroid"] = np.round(inst_info_dict[inst_id]["centroid"] / ds_factor).astype(np.int)
+            inst_info_dict[inst_id]["contour"] = np.round(inst_info_dict[inst_id]["contour"] / ds_factor).astype(np.int)
+
     return inst_info_dict
 
 
